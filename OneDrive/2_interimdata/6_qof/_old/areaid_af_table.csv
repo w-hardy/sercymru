@@ -1,0 +1,14 @@
+areaid,description
+AF 1,The practice can produce a register of patient with atrial fibrillation
+AF 2,The percentage of patient with atrial fibrillation diagnosed after 1 April 2006 with ECG or specialist confirmed diagnosis.
+AF 3,The percentage of patient with atrial fibrillation who are currently treated with anti-coagulation drug therapy or an anti-platelet therapy.
+AF 4,The percentage of patient with atrial fibrillation diagnosed after 1 April 2008 with ECG or specialist confirmed diagnosis.
+AF 6,"In those patients with Atrial Fibrillation in whom there is a record of a  CHADS2 score of 1, the percentage of patients who are currently treated with  anti-coagulation drug therapy or an anti-platelet therapy. "
+AF 7,"In those patients with Atrial Fibrillation in whom there is a record of a  CHADS2 score of greater than 1, the percentage of patients who are currently  treated with anti-coagulation drug therapy "
+AF001,The contractor establishes and maintains a register of patients with atrial fibrillation
+AF 5,The percentage of patients with Atrial Fibrillation in whom stroke risk has been  assessed using the CHADS2 risk stratification scoring system in the preceding 15  months 
+AF002,The percentage of patients with atrial fibrillation in whom stroke risk has been assessed using the CHADS2 risk stratification scoring system in the preceding 12 months (excluding those whose previous CHADS2 score is greater than 1)
+AF004,"In those patients with atrial fibrillation whose latest record of a CHADS2 score is greater than 1, the percentage of patients who are currently treated with anti-coagulation therapy"
+AF002W, The percentage of patients with atrial fibrillation in whom stroke risk has been assessed using the CHADS2 risk stratification scoring system in the preceding 15 months (excluding those whose previous CHADS2 score is greater than 1).
+AF006,The percentage of patients with atrial fibrillation in whom stroke risk has been assessed using the CHA2DS2-VASc score risk stratification scoring system in the preceding 3 years (excluding those patients with a previous CHADS2 or CHA2DS2-VASc score of 2 or more)
+AF007,"In those patients with atrial fibrillation with a record of a CHA2DS2-VASc score of 2 or more, the percentage of patients who are currently treated with anticoagulation drug therapy"

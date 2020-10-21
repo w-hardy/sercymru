@@ -1,3 +1,9 @@
+# Non code files
+/OneDrive/_*/
+/OneDrive/4_outputs
+/OneDrive/5_reporting/
+*.sqlite
+
 # History files
 .Rhistory
 .Rapp.history
