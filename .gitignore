@@ -3,6 +3,7 @@
 /OneDrive/4_outputs
 /OneDrive/5_reporting/
 *.sqlite
+.DS_Store
 
 # History files
 .Rhistory
