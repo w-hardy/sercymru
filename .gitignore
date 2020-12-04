@@ -4,6 +4,7 @@
 /OneDrive/5_reporting/
 *.sqlite
 /r_notebooks/*.html
+*.png
 
 # History files
 .Rhistory

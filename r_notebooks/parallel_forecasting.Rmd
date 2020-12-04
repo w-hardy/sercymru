@@ -1,0 +1,784 @@
+---
+title: "Parallel forecasting"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r, setup}
+# Packages ####
+library(tidyverse)
+library(lubridate)
+library(tsibble)
+library(rstan) # needed to load prophet
+library(prophet)
+library(fable)
+library(fable.prophet)
+library(feasts)
+library(fasster)
+library(furrr)
+library(knitr)
+
+# Options ####
+knitr::opts_chunk$set(cache = TRUE)
+options(mc.cores = parallel::detectCores() - 1)
+rstan_options(auto_write = TRUE)
+options(future.rng.onMisue = "ignore")
+
+# Seed ####
+set.seed(32)
+
+# Functions ####
+
+source("../r_scripts/functions.r")
+
+# Data ####
+
+## Read from local file
+gp <- read_rds("../data/gp_linked_na_omit.rds")
+oc <- read_rds("../data/oral_contraceptives.rds") 
+
+## Sort into monthly count data
+
+oc_monthly_quantity_gp <- 
+  countRegional(oc, PracticeID, datename, Quantity) %>% 
+  right_join(gp, by = c("regional_unit" = "PracticeID")) %>% # want to have GPs which have recorded data for the duration, not just part of it as that would add noise
+  mutate(n = 1000*n/npat) # quantity per 1000 pts
+
+## Sort into monthly count data pre-lockdown (2020-03-23)
+
+oc_monthly_quantity_gp_pre_cv19 <- 
+  oc_monthly_quantity_gp %>% 
+    filter(datename < dmy("01-03-2020"))
+
+## Smaller GP data set to develop process
+regions <- unique(as.character(gp$PracticeID))
+dev_data <- 
+  oc_monthly_quantity_gp_pre_cv19 %>% 
+  filter(regional_unit %in% sample(regions, 5))
+
+
+rm(oc)
+rm(gp)
+```
+
+
+```{r}
+dev_data %>% 
+  fableModels()
+```
+
+
+## Fable fits
+
+* Fits can be estimated across several different fable models
+* This can be done on the original data frame, or on each practice individually
+* Need to ensure that models are the same using each method
+
+
+### As single dataframe
+
+```{r}
+# As one df
+system.time(fit <- dev_data %>% 
+  filter(regional_unit %in% gp$PracticeID) %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  fableModels())
+
+fits1 <- accuracy(fit) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+fits1 %>% 
+  kable(digits = 2)
+```
+
+
+### map()
+
+#### Single core
+
+* `model()` takes advantage of `plan(multisession)` to automatically compute in parallel, but does not include the proper options (i.e., `furrr_options(seed = TRUE)`) and generates a warning. Does not appear to influence estimates.
+
+```{r, eval=FALSE}
+system.time(fit2 <- map_dfr(.x = unique(dev_data$regional_unit), 
+             .f = ~regionalFableFits(dev_data, .x)))
+
+fits2 <- accuracy(fit2) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+fits2 %>% 
+  kable(digits = 2)
+```
+
+
+#### Multi core
+
+```{r}
+plan(multisession)
+
+system.time(
+fit3 <- future_map_dfr(.x = unique(dev_data$regional_unit), 
+             .f = ~regionalFableFits(dev_data, .x), 
+             .options = furrr_options(seed = TRUE)))
+
+fits3 <- accuracy(fit3) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+fits3 %>% 
+  kable(digits = 2)
+
+plan(sequential)
+```
+
+### Are the results the same?
+
+```{r}
+fits1 == fits3
+
+head(fits1); head(fits3)
+```
+
+* Yes
+
+### Function to provide model
+
+
+## Prophet fits
+
+* Prophet is fastest as a single data frame, but are its predictions unique 
+
+### As single dataframe
+
+```{r}
+oc_prophet_model1 <- 
+  fable.prophet::prophet(n ~ growth("linear", n_changepoints = 0) +
+                           season("year", type = "additive") + holiday(holidays))
+oc_prophet_model2 <- 
+  fable.prophet::prophet(n ~ growth("linear",) +
+                           season("year", type = "additive") + holiday(holidays))
+oc_prophet_model3 <- 
+  fable.prophet::prophet(n ~ season("year", type = "additive") + holiday(holidays))
+oc_prophet_model4 <- 
+  fable.prophet::prophet(n ~ holiday(holidays))
+oc_prophet_model5 <- 
+  fable.prophet::prophet(n)
+
+system.time(proph_fit <- dev_data %>% 
+              mutate(datename = yearmonth(datename)) %>% 
+              as_tsibble(index = datename) %>% 
+              model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3, 
+                    oc_prophet_model4, oc_prophet_model5))
+
+proph_fits <- accuracy(proph_fit) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+proph_fits %>% 
+  kable(digits = 2)
+
+
+```
+
+
+### map()
+
+#### Single core
+##### Sequential
+
+```{r}
+system.time(proph_fit2 <- map_dfr(.x = unique(dev_data$regional_unit), 
+             .f = ~regionalProphetFits(dev_data, .x)))
+
+proph_fits2 <- accuracy(proph_fit2) %>% 
+  group_by(.model) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+proph_fits2 %>% 
+  kable(digits = 2)
+```
+
+##### multisession
+```{r, eval=FALSE}
+plan(multisession)
+
+system.time(proph_fit2 <- map_dfr(.x = unique(dev_data$regional_unit), 
+             .f = ~regionalProphetFits(dev_data, .x)))
+
+proph_fits2 <- accuracy(proph_fit2) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+proph_fits2 %>% 
+  kable(digits = 2)
+plan(sequential)
+
+```
+
+#### Multi core
+
+```{r, eval=FALSE}
+plan(multisession)
+system.time(
+  proph_fit3 <- future_map_dfr(.x = unique(dev_data$regional_unit), 
+                               .f = ~regionalProphetFits(dev_data, .x), 
+                               .options = furrr_options(seed = TRUE)))
+
+proph_fits3 <- accuracy(proph_fit3) %>% 
+  group_by(regional_unit) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
+
+proph_fits3 %>% 
+  kable(digits = 2)
+
+plan(sequential)
+```
+
+
+## Model comparions
+
+```{r}
+bind_rows(accuracy(fit3), accuracy(proph_fit), .id = "a") %>% 
+  group_by(.model, a) %>% 
+  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE))) %>% 
+  arrange(RMSE) %>% 
+  kable(digits = 2)
+```
+### Plots
+
+## Joint fable and prophet fits
+
+```{r}
+
+```
+
+## LOO CV
+
+### Example
+
+From https://otexts.com/fpp3/tscv.html
+
+```{r}
+## example 
+google_2015 <- 
+  tsibbledata::gafa_stock %>% 
+  filter(Symbol == "GOOG") %>% 
+  fill_gaps()
+
+# Time series cross-validation accuracy
+google_2015_tr <- google_2015 %>%
+  slice(1:(n()-1)) %>%
+  stretch_tsibble(.init = 3, .step = 1)
+fc <- google_2015_tr %>%
+  model(RW(Close ~ drift())) %>%
+  forecast(h = 1)
+
+fc %>% accuracy(google_2015)
+
+# Residual accuracy
+google_2015 %>%
+  model(RW(Close ~ drift())) %>%
+  accuracy()
+```
+
+
+#### Plotting RMSE for different forecast windows
+
+```{r}
+google_2015_tr <- google_2015 %>%
+  slice(1:(n()-8)) %>%
+  stretch_tsibble(.init = 3, .step = 1)
+
+fc <- google_2015_tr %>%
+  model(RW(Close ~ drift())) %>%
+  forecast(h = 8) %>%
+  group_by(.id) %>%
+  mutate(h = row_number()) %>%
+  ungroup()
+
+fc %>%
+  accuracy(google_2015, by = c("h", ".model")) %>%
+  ggplot(aes(x = h, y = RMSE)) +
+  geom_point()
+```
+
+
+### dev_data single region
+
+```{r}
+tictoc::tic()
+dev_data_tr <- dev_data %>% 
+  filter(regional_unit == "W92003") %>%
+  mutate(datename = yearmonth(datename)) %>% 
+  select(datename, n) %>%
+  fill_gaps() %>% 
+  slice(1:(n()-6)) %>% 
+  stretch_tsibble(.init = 36, .step = 1)
+
+plan(multisession)
+fit <- dev_data_tr %>%
+  fableModels() 
+
+fc <- fit %>%
+  forecast(h = 6)
+plan(sequential)
+tictoc::toc()
+
+
+fc %>%
+    accuracy(mutate(filter(dev_data, regional_unit == "W92003"),
+                    datename = yearmonth(datename)))
+
+plan(multisession)
+bind_rows(
+  fc %>%
+    accuracy(mutate(filter(dev_data, regional_unit == "W92003"),
+                    datename = yearmonth(datename))),
+  filter(dev_data, regional_unit == "W92003") %>% 
+    mutate(datename = yearmonth(datename)) %>%
+    fableModels() %>%
+    accuracy())
+plan(sequential)
+
+fc %>%
+  group_by(.id, .model) %>%
+  mutate(h = row_number()) %>%
+  ungroup() %>%
+  accuracy(mutate(filter(dev_data, regional_unit == "W92003"),
+                    datename = yearmonth(datename))) %>%
+  ggplot(aes(x = .model, y = RMSE, fill = as.factor(.id))) +
+  geom_point() +
+  facet_grid(~"regional_unit")
+
+dev_data_tr %>% 
+  filter(.id == 1) %>% 
+  .$datename %>% 
+  unique()
+
+fc %>%
+  group_by(.id, .model) %>%
+  ungroup() %>% 
+    accuracy(mutate(filter(dev_data, regional_unit == "W92003"),
+                    datename = yearmonth(datename)))
+ggplot(aes(x = datename, y = ))
+
+  
+```
+
+* 1 practice, 6 months, 15 windows = 55 secs
+* With 1 practice, init = 36, step = 1 you end up with 360 obs of 3 variables (datename, n, .id) in the training data set
+* with 1 practice, init = 35, step = 1 you end up with 395 obs of 3 variables (same as above) in the training data set
+
+### multiple regions, single window
+
+```{r}
+tictoc::tic()
+dev_data_tr <- dev_data %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  select(datename, n, regional_unit) %>%
+  group_by(regional_unit) %>% 
+  fill_gaps() %>% 
+  slice(1:(n()-6), .preserve = TRUE) %>% # group_by(regional_unit) and .preserve must be true to maintain structure
+  stretch_tsibble(.init = 35, .step = 1)
+
+regions <- unique(dev_data_tr$regional_unit)
+.ids <- unique(dev_data_tr$.id)
+
+plan(multisession)
+fable_fit <-
+  future_map_dfr(.x = regions,
+                  .f = ~regionalFableFits(filter(dev_data_tr, .id == 1), .x),
+                  .options = furrr_options(seed = TRUE))
+
+message("fable fits complete")
+
+fc <- forecast(fable_fit, h = 6)
+
+message("fabel forecasts complete")
+
+plan(sequential)
+tictoc::toc()
+
+fc %>% 
+    accuracy(mutate(dev_data,
+                    datename = yearmonth(datename)), by = c("regional_unit", ".model"))
+
+
+bind_rows(
+  fc %>%
+    accuracy(mutate(dev_data, datename = yearmonth(datename))),
+  dev_data %>%
+    mutate(datename = yearmonth(datename)) %>%
+    fableModels() %>%
+    accuracy())
+
+
+```
+
+* With 2 practices, you end up with 1005 obs of 4 variables (datename, n, regional_unit, .id)
+* 100 practices, 6 months, 1 window = 285 seconds
+
+
+```{r}
+dev_data_tr_36 <- dev_data %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  select(datename, n, regional_unit) %>%
+  group_by(regional_unit) %>% 
+  fill_gaps() %>% 
+  slice(1:(n()-6), .preserve = TRUE) %>% # group_by(regional_unit) and .preserve must be true to maintain structure
+  stretch_tsibble(.init = 36, .step = 1)
+
+dev_data_tr_36 %>% 
+  as_tibble() %>% 
+  group_by(.id, regional_unit) %>% 
+  count
+
+dev_data_tr_35 <- dev_data %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  select(datename, n, regional_unit) %>%
+  group_by(regional_unit) %>% 
+  fill_gaps() %>% 
+  slice(1:(n()-6), .preserve = TRUE) %>% # group_by(regional_unit) and .preserve must be true to maintain structure
+  stretch_tsibble(.init = 35, .step = 1)
+
+dev_data_tr_35 %>% 
+  as_tibble() %>% 
+  group_by(.id, regional_unit) %>% 
+  count
+```
+
+
+
+### dev_data
+
+```{r, loo-cv}
+#  .init = nrow(df)-cv_dist and slice 1:n()-cv_dist when .step = 1 allows 
+  # parallelFableFits() for .ids[1:length(ids)-cv_dist]
+
+
+parallelFableRegionalFits <- function(data, regions, window){
+
+  print(paste("fable regional fit", window))
+  future_map_dfr(.x = regions,
+                 .f = ~regionalFableFits(filter(data, .id == window), .x),
+                 .options = furrr_options(seed = TRUE))
+}
+
+
+trainingFableRegionalFits <- function(data, cv_dist = 6, init = 36, step = 1){
+  # This function will make use of parallel processing if set up using plan()
+  # Set variables
+  cv_dist <- cv_dist
+  
+  # Create training data
+  data_tr <- data %>% 
+    # group_by(regional_unit) and slice(..., .preserve = TRUE) to maintain structure
+    mutate(datename = yearmonth(datename)) %>% 
+    select(datename, n, regional_unit) %>%
+    group_by(regional_unit) %>% 
+    fill_gaps() %>% 
+    slice(1:(n()-cv_dist), .preserve = TRUE) %>% 
+    stretch_tsibble(.init = init, .step = step)
+  
+  # Set helper variables
+  regions_ids <- unique(data_tr$regional_unit)
+  ids <- unique(data_tr$.id)
+  
+  # Call functions
+  ## Fits
+  fable_fit <- 
+    map(.x = ids,#(length(ids)-cv_dist)],
+            .f = ~parallelFableRegionalFits(dev_data_tr, 
+                                            regions = regions_ids, window = .x),
+            .id = "window")
+  message("fable fits complete")
+  
+  ## Forecasts
+  fc <- forecast(fable_fit, h = cv_dist)
+  message("fable forecasts complete")
+  
+  # Return
+  res <- list(fits = fable_fit, forecasts = fc)
+  return(res)
+}
+
+# # As script
+# tictoc::tic()
+# cv_dist <- 6
+# dev_data_tr <- dev_data %>% # Training data for CV
+#   mutate(datename = yearmonth(datename)) %>% 
+#   select(datename, n) %>%
+#   fill_gaps() %>% 
+#   slice(1:(n()-cv_dist)) %>% 
+#   stretch_tsibble(.init = 36, .step = 1)
+# 
+# regions_ids <- unique(dev_data_tr$regional_unit)
+# ids <- unique(dev_data_tr$.id)
+# 
+# plan(multisession)
+# 
+# 
+# fable_fit <- 
+#   map_dfr(.x = ids[1:(length(ids)-cv_dist)],
+#           .f = ~parallelFableRegionalFits(dev_data_tr, 
+#                                           regions = regions_ids, window = .x),
+#           .id = "window")
+# 
+# message("fable fits complete")
+# 
+# fc <- forecast(fable_fit, h = cv_dist)
+# 
+# message("fabel forecasts complete")
+# 
+# plan(sequential)
+# tictoc::toc()
+
+
+# As function with default values
+plan(multisession)
+system.time(fable_cv <- trainingFableRegionalFits(data = dev_data))
+plan(sequential)
+
+
+# As function with different init value
+plan(multisession)
+system.time(fable_cv_2 <- trainingFableRegionalFits(data = dev_data, init = 37)) 
+system.time(fable_cv_2 <- trainingFableRegionalFits(data = dev_data, init = 35))
+# Fails with init < 36
+plan(sequential)
+
+
+fable_cv_2$forecasts %>% 
+  accuracy(mutate(dev_data,
+                    datename = yearmonth(datename)), by = c("regional_unit", ".model"))
+
+
+fc %>% 
+    accuracy(mutate(dev_data,
+                    datename = yearmonth(datename)), by = c("regional_unit", ".model"))
+
+bind_rows(
+fc %>% 
+    accuracy(mutate(dev_data,
+                    datename = yearmonth(datename)), by = c("regional_unit", ".model")),
+          dev_data %>%
+            mutate(datename = yearmonth(datename)) %>%
+            fableModels() %>%
+            accuracy()) %>% 
+  group_by(.model, .type) %>% 
+  summarise(across(where(is.numeric), mean))
+
+```
+
+* ~108 seconds to CV 2 practices for 6 months across 9 windows
+* ~270 seconds to CV 10 practices for 6 months across 9 windows
+  * If this extrapolates in a  linear fashion, 400 practices would take `r 40*270/60/60` hours to calculate
+  * Based on the 2 practice timing, this seems unlikely and the final time should be less than that
+* Why is id 9 the maximum that will work?
+
+
+### fitting and cv in the same function
+
+```{r}
+tictoc::tic()
+regions <- unique(dev_data$regional_unit)
+cv_dist <- 6
+init <- 36
+step <- 1
+data <- 
+  dev_data %>% 
+  filter(regional_unit == regions[1]) %>% 
+  select(regional_unit, datename, n) %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  fill_gaps() %>% 
+  slice(1:(n()-cv_dist), .preserve = TRUE) %>% 
+  stretch_tsibble(.init = init, .step = step)
+
+fits <- fableModels(data)
+
+fc <- fits %>% forecast(h = cv_dist)
+
+acc <- fc %>% 
+  accuracy(mutate(filter(dev_data, regional_unit == regions[[1]]),
+                    datename = yearmonth(datename))) %>% 
+  arrange(RMSE) %>% 
+  slice(1)
+acc
+
+tictoc::toc()
+```
+
+* `r mean(c(87.7, 76.6, 77.3, 82.517))`
+
+```{r}
+
+fableModels(dev_data)
+regionalFableFits(dev_data, Arfon)
+
+system.time(best_models_1 <- regionalCV(dev_data))
+system.time(best_models_2 <- regionalCV(dev_data, init = 30))
+system.time(best_models_3 <- regionalCV(dev_data, step = 2))
+
+
+system.time(best_oc_models1 <- regionalCV(oc_monthly_quantity_gp_pre_cv19))
+
+best_oc_models1 %>% 
+  saveRDS(file = "../data/oc_gp_cv_models.rds")
+
+best_models_1 %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  ggplot(aes(x = RMSE)) +
+  geom_histogram()
+
+best_models_1 %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  group_by(.model) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+* 1 regional_unit
+  * Mean time `r mean(c(78.5, 77.7))` s w/o prophet
+  * Mean time `r mean(c(142.466, 147.631))` s w prophet
+* 2 regional units
+  * min = 671.0648, lq = 691.4213, mean = 699.9314, median = 700.2545, uq = 710.868, max = 726.0485, 
+* 100 regional units
+  * Mean time `r mean(c(66, 61))` mins
+* 400 regional units
+  * `r lubridate::seconds_to_period(29663.27)` hours
+  
+  
+### prophet::cross_validation()
+
+```{r}
+cross_validation(select(oc_gp_cluster_fcts$fits, c(regional_unit, starts_with("oc_proph"))), horizon = .5, units = "years", initial = 3)
+```
+
+
+## Model selection
+
+```{r}
+## accuracy of each model on each regional_unit
+accuracies <- joint_fits$fits %>% 
+  accuracy()
+
+
+bestModelFit <- function(data, measure){
+  measure = enquo(measure)
+  
+  data <- janitor::clean_names(data)
+  
+  data %>% 
+    group_by(regional_unit) %>% 
+    summarise("{{ measure }}" := min(!!measure), .groups = "drop") %>% 
+    select(regional_unit, !!measure) %>% 
+    left_join(data, by = c("regional_unit", as_name(measure))) %>% # doesn't provide the single match if models are tied 
+    select(regional_unit, model, everything(), -type)
+  
+}
+
+bestModelFit(accuracies, rmse)
+```
+
+
+## Joint Fable and Prophet fits & forecast
+
+* Take a tsibble and fit both the fable and prophet models to return a single dataframe of models that can be used for forecasting
+
+```{r}
+library(progressr)
+handlers("progress")
+
+
+
+joint_fits <- regionalFitsJoint(data = dev_data)
+
+joint_fits
+```
+
+
+
+
+
+
+
+
+## Close multisession workers
+```{r}
+plan(sequential)
+```
+
+
+## Other
+
+```{r, eval=FALSE}
+x <- dev_data %>% 
+  mutate(datename = yearmonth(datename)) %>% 
+  as_tsibble(index = datename) %>% 
+  model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3, 
+        oc_prophet_model4, oc_prophet_model5)
+
+x2 <- forecast(x, h = "5 months")
+
+mean(quantile(x = x2$n, p = c(.1)))
+mean(quantile(x = x2$n, p = c(.5)))
+mean(quantile(x = x2$n, p = c(.9)))
+
+x3 <- 
+  x2 %>% 
+  mutate(LB = quantile(n, p = .05),
+         .median = quantile(n, p = .5),
+         UB = quantile(n, p = .95))
+
+x3 %>% 
+  mutate(model = as.factor(.model)) %>% 
+  filter(regional_unit == "W91027") %>% 
+  ggplot(aes(x = datename, y = .median, colour = as.factor(model))) + 
+  geom_line(aes(colour = as.factor(model)), lty = 2) +
+  geom_ribbon(aes(ymin = LB, ymax = UB, fill = as.factor(model)), alpha = .3) +
+  geom_line(aes(y = n, x = datename), data = filter(oc_monthly_quantity_gp %>% mutate(datename = yearmonth(datename)), regional_unit == "W91027"))
+  
+
+###
+
+proph_fcst1 <-
+  proph_fit %>% 
+  forecast(h = "5 months")
+autoplot(filter(proph_fcst1, regional_unit == "W91027"))
+
+proph_fcst1 %>% 
+  ggplot(aes(x = datename, y = .mean, colour = as.factor(regional_unit))) +
+  geom_line() +
+  facet_wrap(~as.factor(regional_unit))
+
+filter(proph_fcst1, regional_unit == "W92003") %>% 
+  autoplot(filter(oc_monthly_quantity_gp, regional_unit == "W92003"))
+
+###
+
+df <- oc_monthly_quantity_gp_pre_cv19 %>% 
+  transmute(ds = yearmonth(datename), y = n)
+m <- prophet::prophet(df, seasonality.mode = "additive")
+future <- make_future_dataframe(m, periods = 6, freq = 'month')
+fcst <- predict(m, future)
+prophet_plot_components(m, fcst)
+
+oc_monthly_quantity_gp %>% 
+  ggplot(aes(x = datename, y = n)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = c(rep(NA,50), fcst[51:55,]$yhat_lower),
+                  ymax = c(rep(NA,50), fcst[51:55,]$yhat_upper)),
+              alpha = .1, fill = "blue") +
+  geom_line(aes(y = c(fcst[1:50,]$yhat, rep(NA, 5))),
+            col = "blue", lty = 2) +
+  geom_line(aes(y = c(rep(NA,50), fcst[51:55,]$yhat)),
+            col = "blue", lty = 3) +
+  geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
+```
