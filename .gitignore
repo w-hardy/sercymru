@@ -3,10 +3,7 @@
 /OneDrive/4_outputs
 /OneDrive/5_reporting/
 *.sqlite
-<<<<<<< HEAD
-=======
-.DS_Store
->>>>>>> 8865660682bd762fb6f61eb2d061dd11bfa86ee1
+/r_notebooks/*.html
 
 # History files
 .Rhistory
