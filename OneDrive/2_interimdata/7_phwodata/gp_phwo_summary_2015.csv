@@ -1,0 +1,460 @@
+PracticeID,GPCluster,LA,HB,listsize,pcent65plus,pcentdep,pcentvillage
+W00005,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"7,938",16.0,61.7,0.4
+W00007,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"6,234",14.7,47.9,4.9
+W00065,Conwy West,Conwy,Betsi Cadwaladr UHB,"2,237",23.0,0.1,97.0
+W00067,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"24,776",21.9,61.4,20.1
+W00076,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"9,909",18.2,13.5,19.4
+W00133,Llanelli,Carmarthenshire,Hywel Dda UHB,"7,785",20.8,51.6,2.1
+W00134,Llanelli,Carmarthenshire,Hywel Dda UHB,"8,298",18.7,46.9,0.6
+W00141,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"4,218",17.2,74.3,2.3
+W00142,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"8,430",21.1,86.8,39.5
+W00143,Upper Valleys,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"3,729",20.0,43.7,20.9
+W00144,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"6,483",17.3,61.9,0.5
+W91002,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"10,454",23.2,0.1,58.0
+W91003,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"16,130",22.0,59.0,0.3
+W91004,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"13,962",21.5,27.8,2.8
+W91005,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"9,567",19.9,45.5,23.0
+W91006,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"8,263",15.5,46.5,0.3
+W91007,Conwy East,Conwy,Betsi Cadwaladr UHB,"10,976",22.0,30.6,4.6
+W91009,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"18,357",26.1,49.2,18.3
+W91010,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"9,105",24.5,11.3,21.0
+W91013,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"8,323",21.5,2.5,18.6
+W91014,Conwy East,Conwy,Betsi Cadwaladr UHB,"7,291",26.1,80.1,0.1
+W91015,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"9,989",20.5,22.2,0.5
+W91016,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"4,678",19.9,20.1,16.6
+W91017,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"11,411",26.8,14.1,32.4
+W91018,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"9,403",22.8,18.4,0.4
+W91019,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"8,865",17.1,51.9,1.6
+W91020,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"6,493",16.2,48.6,1.4
+W91021,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"15,322",17.6,10.5,0.1
+W91022,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"13,019",17.1,42.7,2.4
+W91023,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"5,318",22.8,6.5,19.7
+W91024,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"4,873",20.0,25.2,7.7
+W91025,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"11,930",23.5,13.2,12.5
+W91026,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"5,630",20.0,3.6,88.6
+W91027,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"5,220",19.6,38.7,47.9
+W91028,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"7,229",21.2,50.2,4.5
+W91029,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"7,609",20.5,31.4,45.4
+W91030,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"6,314",15.7,51.5,1.5
+W91031,Conwy East,Conwy,Betsi Cadwaladr UHB,"8,901",21.4,46.0,0.7
+W91032,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"4,905",16.7,51.3,2.5
+W91033,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"9,174",24.1,18.3,47.5
+W91034,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"2,828",24.1,0.4,53.3
+W91036,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"7,998",20.3,44.7,0.0
+W91037,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"2,818",15.6,57.8,20.0
+W91038,Conwy East,Conwy,Betsi Cadwaladr UHB,"15,341",28.0,43.3,14.5
+W91039,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"5,505",19.9,45.6,0.5
+W91040,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"6,516",17.5,29.0,0.3
+W91042,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"3,840",16.2,33.0,2.3
+W91043,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"9,347",19.1,47.5,1.1
+W91044,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"2,477",21.3,0.6,40.7
+W91046,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"4,091",18.9,46.5,2.8
+W91047,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"3,916",23.2,0.0,99.9
+W91048,Conwy East,Conwy,Betsi Cadwaladr UHB,"8,384",24.6,42.9,0.5
+W91050,Conwy East,Conwy,Betsi Cadwaladr UHB,"1,246",27.8,31.5,4.8
+W91051,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"8,008",13.8,60.7,0.3
+W91053,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"6,074",19.6,55.7,0.4
+W91054,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"5,787",16.1,15.9,0.7
+W91055,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"6,656",19.4,41.2,6.3
+W91056,West & North Wrexham,Wrexham,Betsi Cadwaladr UHB,"2,582",15.4,28.4,12.7
+W91057,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"3,382",21.0,32.3,45.7
+W91058,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"5,347",19.4,58.1,1.6
+W91059,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"5,796",15.0,61.4,0.3
+W91060,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"5,768",15.2,32.1,0.3
+W91604,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"1,298",27.6,0.1,99.0
+W91607,"Deeside, Hawarden & Saltney",Flintshire,Betsi Cadwaladr UHB,"2,132",16.4,47.0,0.4
+W91610,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"1,785",20.7,8.2,23.5
+W91614,South Wrexham,Wrexham,Betsi Cadwaladr UHB,"2,489",17.7,60.4,1.1
+W91615,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"2,296",20.0,73.3,0.7
+W91618,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"3,898",18.6,10.0,36.6
+W91622,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"5,080",15.7,59.3,11.4
+W91624,Central & South Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"1,658",21.1,31.9,48.3
+W91626,"Mold, Buckley & Caergwle",Flintshire,Betsi Cadwaladr UHB,"2,008",16.4,12.4,28.7
+W91629,Wrexham Town,Wrexham,Betsi Cadwaladr UHB,"3,411",8.6,76.7,0.9
+W91632,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"2,434",25.3,41.5,6.8
+W91635,Conwy East,Conwy,Betsi Cadwaladr UHB,"1,752",24.0,47.6,2.7
+W91636,Holywell & Flint,Flintshire,Betsi Cadwaladr UHB,"3,401",16.8,58.7,20.1
+W91640,North Denbighshire,Denbighshire,Betsi Cadwaladr UHB,"2,123",20.3,10.6,1.9
+W92002,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"12,218",19.0,24.6,42.4
+W92003,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"7,907",23.6,52.5,35.8
+W92005,South Ceredigion,Ceredigion,Hywel Dda UHB,"4,985",27.6,2.3,77.1
+W92006,North Ceredigion,Ceredigion,Hywel Dda UHB,"2,710",29.6,1.1,94.7
+W92007,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"7,266",25.4,17.6,95.9
+W92008,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"7,967",22.1,71.8,7.0
+W92009,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"9,520",24.3,8.7,73.0
+W92013,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"4,115",19.6,35.1,86.5
+W92014,North Ceredigion,Ceredigion,Hywel Dda UHB,"11,438",14.9,10.6,34.8
+W92015,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"4,926",28.8,0.1,44.8
+W92016,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"14,317",22.4,19.7,34.3
+W92018,South Ceredigion,Ceredigion,Hywel Dda UHB,"7,444",24.7,33.7,94.3
+W92019,South Ceredigion,Ceredigion,Hywel Dda UHB,"5,758",26.7,13.9,88.8
+W92021,Llanelli,Carmarthenshire,Hywel Dda UHB,"6,338",22.5,56.1,1.2
+W92022,North Ceredigion,Ceredigion,Hywel Dda UHB,"6,330",26.7,0.1,82.0
+W92023,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"6,952",23.1,5.1,68.6
+W92024,North Ceredigion,Ceredigion,Hywel Dda UHB,"11,404",8.5,7.3,26.9
+W92025,North Ceredigion,Ceredigion,Hywel Dda UHB,"7,702",21.2,15.2,49.6
+W92027,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"8,656",24.7,0.3,43.1
+W92031,Llanelli,Carmarthenshire,Hywel Dda UHB,"6,058",24.5,43.6,1.1
+W92033,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"8,650",31.3,0.7,50.7
+W92034,South Ceredigion,Ceredigion,Hywel Dda UHB,"6,493",26.3,17.3,87.5
+W92035,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"6,930",24.3,20.5,24.5
+W92036,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"9,396",23.3,54.1,10.4
+W92037,Llanelli,Carmarthenshire,Hywel Dda UHB,"8,963",18.6,54.7,1.8
+W92038,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"6,028",25.5,0.1,70.7
+W92039,South Ceredigion,Ceredigion,Hywel Dda UHB,"11,485",22.3,11.2,60.8
+W92040,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"8,846",21.7,39.7,4.8
+W92041,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"8,737",21.1,63.9,11.6
+W92042,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"14,219",20.9,23.4,39.1
+W92044,South Ceredigion,Ceredigion,Hywel Dda UHB,"7,712",26.3,26.4,59.2
+W92046,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"4,120",23.1,6.6,55.0
+W92048,Llanelli,Carmarthenshire,Hywel Dda UHB,"4,705",22.3,14.1,1.3
+W92050,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"7,342",19.1,20.2,29.2
+W92051,Amman/Gwendraeth,Carmarthenshire,Hywel Dda UHB,"8,205",21.3,22.0,12.7
+W92052,Llanelli,Carmarthenshire,Hywel Dda UHB,"14,533",19.8,56.7,2.0
+W92053,North Ceredigion,Ceredigion,Hywel Dda UHB,"3,509",25.6,0.2,98.7
+W92055,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"5,467",25.6,25.6,75.3
+W92056,North Ceredigion,Ceredigion,Hywel Dda UHB,"3,099",25.3,1.3,95.0
+W92058,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"2,517",25.5,0.0,40.7
+W92059,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"2,555",26.1,0.4,85.9
+W92060,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"3,146",25.6,0.2,78.6
+W92061,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"4,554",22.5,0.0,43.8
+W92063,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"3,481",23.9,22.7,83.1
+W92064,North Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"6,252",26.6,0.8,78.4
+W92065,South Ceredigion,Ceredigion,Hywel Dda UHB,"3,869",27.6,26.6,56.4
+W92436,Llanelli,Carmarthenshire,Hywel Dda UHB,"1,301",25.6,46.7,1.9
+W92440,South Pembrokeshire,Pembrokeshire,Hywel Dda UHB,"3,402",18.8,7.1,16.3
+W92614,Llanelli,Carmarthenshire,Hywel Dda UHB,"3,095",15.6,55.6,2.9
+W92616,Taf / Teifi / Tywi,Carmarthenshire,Hywel Dda UHB,"2,960",23.4,16.3,36.5
+W93001,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"6,876",17.4,26.6,0.1
+W93004,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"8,878",25.5,23.8,16.5
+W93007,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"4,436",18.3,85.3,0.0
+W93008,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"2,272",24.3,78.5,0.4
+W93009,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"3,721",17.5,89.0,0.2
+W93010,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"2,511",17.1,80.7,23.5
+W93011,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"11,232",17.7,32.0,4.5
+W93012,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"5,792",19.4,43.8,5.5
+W93014,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"4,740",18.9,53.6,4.0
+W93015,Torfaen North,Torfaen,Aneurin Bevan UHB,"5,947",19.6,78.5,0.1
+W93018,Newport Central,Newport,Aneurin Bevan UHB,"9,384",19.9,11.2,5.1
+W93019,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"2,306",25.7,0.5,88.4
+W93020,Monmouthshire South,Monmouthshire,Aneurin Bevan UHB,"6,179",21.0,10.0,22.6
+W93021,Monmouthshire South,Monmouthshire,Aneurin Bevan UHB,"7,278",19.0,9.7,22.7
+W93022,Monmouthshire South,Monmouthshire,Aneurin Bevan UHB,"6,278",18.0,11.5,23.1
+W93023,Monmouthshire South,Monmouthshire,Aneurin Bevan UHB,"19,458",20.1,14.9,9.2
+W93024,Torfaen South,Torfaen,Aneurin Bevan UHB,"8,970",19.7,48.5,0.2
+W93025,Torfaen South,Torfaen,Aneurin Bevan UHB,"4,392",24.2,13.2,0.1
+W93026,Torfaen South,Torfaen,Aneurin Bevan UHB,"4,355",19.6,52.1,0.4
+W93027,Torfaen South,Torfaen,Aneurin Bevan UHB,"8,820",19.4,42.7,0.3
+W93028,Torfaen South,Torfaen,Aneurin Bevan UHB,"6,580",16.9,44.4,0.3
+W93029,Torfaen South,Torfaen,Aneurin Bevan UHB,"6,437",14.2,53.6,0.0
+W93030,Torfaen South,Torfaen,Aneurin Bevan UHB,"5,917",14.3,53.0,0.1
+W93031,Torfaen North,Torfaen,Aneurin Bevan UHB,"6,373",18.2,39.5,0.2
+W93032,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"8,394",19.3,59.5,0.0
+W93033,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"10,203",23.4,30.6,16.3
+W93035,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"6,826",17.6,69.1,0.1
+W93036,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"10,145",25.9,11.4,18.5
+W93037,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"4,608",24.8,0.1,46.9
+W93038,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"2,780",25.4,0.8,48.7
+W93039,Newport West,Newport,Aneurin Bevan UHB,"3,965",11.3,83.8,0.0
+W93040,Newport East,Newport,Aneurin Bevan UHB,"5,721",16.3,59.7,0.7
+W93041,Newport West,Newport,Aneurin Bevan UHB,"4,401",16.4,70.3,0.1
+W93043,Newport Central,Newport,Aneurin Bevan UHB,"5,951",20.9,42.8,0.8
+W93044,Newport East,Newport,Aneurin Bevan UHB,"7,740",14.1,62.6,0.2
+W93045,Newport Central,Newport,Aneurin Bevan UHB,"7,720",20.2,36.3,0.0
+W93046,Newport Central,Newport,Aneurin Bevan UHB,"4,726",16.1,47.0,0.1
+W93047,Newport East,Newport,Aneurin Bevan UHB,"6,485",19.2,79.2,0.3
+W93048,Newport West,Newport,Aneurin Bevan UHB,"14,873",14.2,84.1,0.0
+W93049,Newport Central,Newport,Aneurin Bevan UHB,"11,730",16.2,41.3,0.2
+W93051,Newport Central,Newport,Aneurin Bevan UHB,"8,986",15.8,49.9,0.0
+W93052,Newport East,Newport,Aneurin Bevan UHB,"5,534",17.1,55.5,0.4
+W93053,Newport East,Newport,Aneurin Bevan UHB,"13,333",16.5,54.6,0.9
+W93054,Newport West,Newport,Aneurin Bevan UHB,"10,790",21.9,68.1,0.0
+W93055,Torfaen North,Torfaen,Aneurin Bevan UHB,"7,058",20.5,44.5,0.7
+W93056,Torfaen North,Torfaen,Aneurin Bevan UHB,"6,701",18.8,61.2,1.4
+W93057,Torfaen North,Torfaen,Aneurin Bevan UHB,"10,814",17.7,66.7,0.1
+W93058,Torfaen North,Torfaen,Aneurin Bevan UHB,"11,820",22.6,46.9,0.8
+W93059,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"7,695",15.3,42.9,0.0
+W93061,Newport West,Newport,Aneurin Bevan UHB,"10,258",22.6,13.4,0.0
+W93063,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"5,568",22.4,62.2,0.2
+W93064,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"14,836",19.1,53.3,6.6
+W93065,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"6,964",19.6,62.3,0.1
+W93067,Caerphilly East,Caerphilly,Aneurin Bevan UHB,"8,998",18.3,23.7,0.3
+W93068,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"8,736",17.9,78.8,5.0
+W93071,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"4,889",20.5,73.0,1.4
+W93072,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"2,872",18.5,6.4,18.1
+W93075,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"5,502",18.3,87.7,0.1
+W93115,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"6,258",18.1,96.6,0.0
+W93116,Newport West,Newport,Aneurin Bevan UHB,"4,421",11.6,59.4,0.0
+W93117,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"2,135",25.6,0.2,40.0
+W93125,Newport East,Newport,Aneurin Bevan UHB,"3,672",15.4,39.5,6.6
+W93126,Monmouthshire North,Monmouthshire,Aneurin Bevan UHB,"2,988",21.6,25.3,22.8
+W93614,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"2,445",19.9,60.4,0.7
+W93619,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"3,279",20.4,84.2,0.1
+W93623,Blaenau Gwent West,Blaenau Gwent,Aneurin Bevan UHB,"4,085",16.1,68.2,0.0
+W93628,Newport West,Newport,Aneurin Bevan UHB,"3,803",13.9,53.6,0.1
+W93631,Blaenau Gwent East,Blaenau Gwent,Aneurin Bevan UHB,"2,128",17.6,87.8,0.0
+W93640,Newport East,Newport,Aneurin Bevan UHB,"3,842",16.4,57.1,0.0
+W93642,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"2,013",22.0,59.9,1.3
+W93643,Monmouthshire South,Monmouthshire,Aneurin Bevan UHB,"1,428",20.4,0.9,91.3
+W94001,Conwy West,Conwy,Betsi Cadwaladr UHB,"9,089",24.8,47.5,0.2
+W94002,Anglesey,Anglesey,Betsi Cadwaladr UHB,"10,208",24.9,36.6,61.7
+W94003,Conwy West,Conwy,Betsi Cadwaladr UHB,"7,548",22.1,16.2,2.6
+W94004,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"4,942",21.6,58.0,41.5
+W94005,Conwy West,Conwy,Betsi Cadwaladr UHB,"2,687",19.3,0.1,85.7
+W94006,Anglesey,Anglesey,Betsi Cadwaladr UHB,"4,813",23.4,15.1,43.0
+W94007,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"5,461",34.5,14.9,42.7
+W94008,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"4,775",31.2,8.0,47.4
+W94009,Anglesey,Anglesey,Betsi Cadwaladr UHB,"4,777",31.8,0.4,55.7
+W94010,Arfon,Gwynedd,Betsi Cadwaladr UHB,"11,635",8.6,3.6,11.1
+W94011,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,"7,346",22.9,4.8,44.7
+W94012,Arfon,Gwynedd,Betsi Cadwaladr UHB,"7,149",19.6,41.4,27.9
+W94014,Anglesey,Anglesey,Betsi Cadwaladr UHB,"4,677",21.9,58.2,14.2
+W94015,Anglesey,Anglesey,Betsi Cadwaladr UHB,"8,310",24.6,24.8,51.8
+W94016,Conwy West,Conwy,Betsi Cadwaladr UHB,"3,696",23.2,18.9,13.3
+W94017,Arfon,Gwynedd,Betsi Cadwaladr UHB,"5,905",19.7,29.9,24.7
+W94018,Conwy West,Conwy,Betsi Cadwaladr UHB,"6,543",36.0,8.3,0.1
+W94019,Conwy West,Conwy,Betsi Cadwaladr UHB,"10,381",26.0,41.9,0.0
+W94020,Conwy West,Conwy,Betsi Cadwaladr UHB,"1,520",24.8,19.9,6.8
+W94021,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,"3,810",31.5,1.9,52.5
+W94023,Anglesey,Anglesey,Betsi Cadwaladr UHB,"7,231",29.5,6.7,34.8
+W94024,Conwy West,Conwy,Betsi Cadwaladr UHB,"5,342",22.9,0.1,44.7
+W94025,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,"5,489",29.2,0.5,66.7
+W94026,Anglesey,Anglesey,Betsi Cadwaladr UHB,"5,278",20.0,62.0,12.3
+W94027,Arfon,Gwynedd,Betsi Cadwaladr UHB,"5,776",18.4,1.5,29.9
+W94028,Arfon,Gwynedd,Betsi Cadwaladr UHB,"6,105",16.4,2.3,29.5
+W94029,Anglesey,Anglesey,Betsi Cadwaladr UHB,"6,821",20.9,32.5,48.7
+W94030,Arfon,Gwynedd,Betsi Cadwaladr UHB,"5,969",17.3,48.1,29.4
+W94031,Conwy West,Conwy,Betsi Cadwaladr UHB,"6,593",23.7,20.9,14.2
+W94032,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"7,332",26.6,2.3,40.4
+W94033,Arfon,Gwynedd,Betsi Cadwaladr UHB,"2,377",20.9,50.4,72.9
+W94034,Arfon,Gwynedd,Betsi Cadwaladr UHB,"8,366",16.7,18.8,22.4
+W94035,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"4,444",21.4,0.0,55.2
+W94036,Meirionnydd,Gwynedd,Betsi Cadwaladr UHB,"4,741",27.3,15.3,45.5
+W94037,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,"4,423",23.8,29.6,72.8
+W94038,Anglesey,Anglesey,Betsi Cadwaladr UHB,"10,195",20.3,50.6,31.2
+W94039,Arfon,Gwynedd,Betsi Cadwaladr UHB,"5,318",18.2,10.1,63.6
+W94040,Arfon,Gwynedd,Betsi Cadwaladr UHB,"4,054",15.2,20.7,18.8
+W94043,Anglesey,Anglesey,Betsi Cadwaladr UHB,"2,295",21.0,58.7,76.0
+W94046,Conwy West,Conwy,Betsi Cadwaladr UHB,"4,739",22.1,14.2,26.5
+W94609,Arfon,Gwynedd,Betsi Cadwaladr UHB,"3,005",26.1,44.2,70.7
+W94612,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,"3,124",25.7,0.1,56.1
+W94615,Dwyfor,Gwynedd,Betsi Cadwaladr UHB,805,37.6,1.1,57.5
+W94618,Arfon,Gwynedd,Betsi Cadwaladr UHB,"2,186",23.5,50.5,71.0
+W94622,Conwy West,Conwy,Betsi Cadwaladr UHB,"2,718",22.9,50.3,0.3
+W94633,Anglesey,Anglesey,Betsi Cadwaladr UHB,"1,269",21.4,8.0,35.4
+W95001,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"8,072",21.4,79.5,2.6
+W95004,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"7,579",18.2,69.2,0.0
+W95005,North Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"3,288",12.8,71.3,0.0
+W95006,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"2,926",24.6,70.1,0.0
+W95007,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"5,153",18.4,70.9,0.0
+W95008,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"10,190",20.4,30.8,5.8
+W95009,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"9,232",20.1,63.8,7.4
+W95010,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"17,726",18.7,22.9,5.8
+W95011,South Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"16,990",17.7,20.2,0.0
+W95012,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"5,248",17.2,79.8,0.1
+W95013,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"5,826",20.3,97.2,12.5
+W95014,North Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"12,024",21.4,35.3,0.0
+W95015,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"3,136",22.7,67.9,0.0
+W95016,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"5,314",19.7,85.8,0.3
+W95017,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"7,167",19.6,11.1,1.7
+W95018,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"11,891",16.0,17.4,0.8
+W95019,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"6,346",18.8,94.3,0.0
+W95020,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"5,753",19.2,62.2,15.4
+W95023,North Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"8,850",19.8,64.6,0.0
+W95024,North Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"16,120",15.4,43.7,0.0
+W95025,South Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"12,061",18.8,16.0,3.1
+W95026,South Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"5,164",17.9,73.0,0.0
+W95027,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"6,197",17.8,94.5,0.0
+W95028,North Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"5,653",20.3,67.5,0.1
+W95029,South Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"3,792",16.5,89.8,0.0
+W95030,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"4,195",21.1,67.3,0.0
+W95031,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"7,631",16.2,99.7,15.2
+W95032,South Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"5,633",17.4,66.4,0.0
+W95033,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"4,547",23.0,75.6,2.7
+W95034,Bridgend West Network,Bridgend,Abertawe Bro Morgannwg UHB,"10,042",18.6,72.0,8.5
+W95035,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"18,520",17.7,32.8,6.7
+W95036,South Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"11,659",16.3,23.8,0.0
+W95037,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"9,731",19.5,43.0,1.0
+W95038,South Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"4,288",15.6,94.5,0.0
+W95041,Bridgend West Network,Bridgend,Abertawe Bro Morgannwg UHB,"13,773",29.0,32.9,0.0
+W95042,South Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"6,497",16.1,53.8,0.0
+W95043,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"5,842",21.9,46.2,0.0
+W95044,South Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"9,152",16.6,73.6,0.0
+W95045,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"3,229",19.8,92.3,0.0
+W95046,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"12,747",21.1,34.9,2.5
+W95047,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"8,103",20.2,66.2,3.0
+W95049,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"7,952",14.5,54.2,1.1
+W95050,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"6,565",15.2,74.1,0.8
+W95051,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"7,655",19.5,99.5,0.0
+W95052,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"2,434",21.9,68.1,0.7
+W95054,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"5,651",16.5,78.8,0.0
+W95055,South Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"1,758",24.2,82.2,0.1
+W95057,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"5,756",18.8,94.3,0.0
+W95058,North Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"12,909",14.8,65.0,0.0
+W95059,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"10,043",15.7,37.3,2.2
+W95060,South Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"6,984",16.3,0.1,0.0
+W95062,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"7,022",18.6,92.2,0.0
+W95063,Bridgend West Network,Bridgend,Abertawe Bro Morgannwg UHB,"8,017",17.8,75.0,18.3
+W95064,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"5,168",20.2,63.9,0.6
+W95065,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"13,283",18.1,51.5,0.0
+W95067,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"4,397",17.2,66.9,23.0
+W95068,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"10,376",16.9,80.8,4.3
+W95069,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"5,467",14.9,38.4,1.9
+W95070,Bridgend East Network,Bridgend,Abertawe Bro Morgannwg UHB,"8,456",19.0,23.5,7.2
+W95071,North Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"6,035",20.3,84.5,0.1
+W95072,South Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"11,846",16.6,54.1,0.3
+W95073,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"2,834",13.5,32.6,0.2
+W95076,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"3,766",18.4,91.8,0.0
+W95078,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"2,653",13.5,80.4,3.1
+W95079,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"4,405",14.5,33.3,2.8
+W95080,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"8,385",18.9,85.6,13.1
+W95081,Caerphilly North,Caerphilly,Aneurin Bevan UHB,"4,259",15.1,98.3,6.3
+W95086,North Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"11,407",16.5,64.7,0.1
+W95087,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"4,245",19.7,83.9,0.2
+W95290,South Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"1,966",19.9,86.2,0.2
+W95295,South Rhondda,Rhondda Cynon Taf,Cwm Taf UHB,"5,337",18.1,91.6,0.4
+W95610,North Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"2,956",21.4,47.9,0.0
+W95619,North Taf Ely,Rhondda Cynon Taf,Cwm Taf UHB,"2,287",19.4,89.7,0.0
+W95623,South Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"4,565",20.2,88.6,0.0
+W95633,North Cynon,Rhondda Cynon Taf,Cwm Taf UHB,"8,383",17.0,84.5,1.0
+W95634,South Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"2,937",19.0,72.6,0.0
+W95636,Caerphilly South,Caerphilly,Aneurin Bevan UHB,"4,260",14.3,75.0,2.8
+W95643,Bridgend West Network,Bridgend,Abertawe Bro Morgannwg UHB,"2,314",31.3,36.0,0.7
+W95645,Bridgend North Network,Bridgend,Abertawe Bro Morgannwg UHB,"2,966",20.8,82.0,12.1
+W95647,North Merthyr Tydfil,Merthyr Tydfil,Cwm Taf UHB,"2,699",11.5,71.7,0.0
+W95751,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"1,823",23.7,1.8,35.8
+W96001,North Powys,Powys,Powys tHB,"6,812",27.1,8.8,81.7
+W96002,South Powys,Powys,Powys tHB,"12,074",22.1,50.6,20.5
+W96003,South Powys,Powys,Powys tHB,"15,569",22.8,9.6,45.8
+W96004,Mid Powys,Powys,Powys tHB,"3,352",27.2,0.1,30.5
+W96005,North Powys,Powys,Powys tHB,"8,488",26.2,0.2,66.7
+W96006,Mid Powys,Powys,Powys tHB,"3,301",30.1,0.6,37.7
+W96007,Mid Powys,Powys,Powys tHB,"7,789",27.3,5.2,66.5
+W96009,North Powys,Powys,Powys tHB,"5,435",25.6,2.2,94.0
+W96010,North Powys,Powys,Powys tHB,"10,966",21.9,25.3,43.8
+W96011,North Powys,Powys,Powys tHB,"2,614",26.1,0.5,84.0
+W96012,North Powys,Powys,Powys tHB,"10,104",24.4,0.0,99.6
+W96013,Mid Powys,Powys,Powys tHB,"9,939",26.6,21.5,44.9
+W96014,North Powys,Powys,Powys tHB,"4,247",24.0,0.2,56.3
+W96015,North Powys,Powys,Powys tHB,"14,560",18.7,48.1,27.7
+W96016,South Powys,Powys,Powys tHB,"9,344",29.1,0.4,47.8
+W96017,South Powys,Powys,Powys tHB,"7,516",26.3,0.0,60.1
+W96438,Mid Powys,Powys,Powys tHB,"2,735",31.4,0.0,18.8
+W97001,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"12,957",17.2,36.9,5.3
+W97002,Cardiff South East,Cardiff,Cardiff & Vale UHB,"7,366",10.8,78.7,0.0
+W97003,Eastern Vale,Vale of Glamorgan,Cardiff & Vale UHB,"7,133",20.0,0.2,0.0
+W97005,Cardiff South West,Cardiff,Cardiff & Vale UHB,"4,229",18.8,49.6,0.3
+W97006,Cardiff East,Cardiff,Cardiff & Vale UHB,"18,146",10.4,49.6,0.1
+W97007,Cardiff South East,Cardiff,Cardiff & Vale UHB,"7,246",11.1,94.3,0.0
+W97008,Cardiff East,Cardiff,Cardiff & Vale UHB,"8,587",11.7,63.6,0.0
+W97009,Cardiff South East,Cardiff,Cardiff & Vale UHB,"6,522",4.0,0.9,0.0
+W97010,Cardiff North,Cardiff,Cardiff & Vale UHB,"9,268",19.2,5.9,0.0
+W97011,Eastern Vale,Vale of Glamorgan,Cardiff & Vale UHB,"8,964",22.8,0.0,0.0
+W97013,Cardiff North,Cardiff,Cardiff & Vale UHB,"9,074",22.7,17.5,0.3
+W97014,Cardiff South East,Cardiff,Cardiff & Vale UHB,"7,609",8.7,28.5,0.0
+W97015,Cardiff North,Cardiff,Cardiff & Vale UHB,"14,690",20.3,4.0,0.0
+W97016,Cardiff South West,Cardiff,Cardiff & Vale UHB,"4,437",16.9,71.2,0.5
+W97017,Cardiff South West,Cardiff,Cardiff & Vale UHB,"8,278",15.3,80.3,8.4
+W97018,Cardiff South West,Cardiff,Cardiff & Vale UHB,"5,254",4.6,47.2,0.2
+W97019,Eastern Vale,Vale of Glamorgan,Cardiff & Vale UHB,"5,129",22.7,0.4,0.2
+W97020,Cardiff South East,Cardiff,Cardiff & Vale UHB,"7,240",14.0,12.1,0.0
+W97021,Cardiff North,Cardiff,Cardiff & Vale UHB,"9,747",19.6,3.2,0.0
+W97022,Cardiff North,Cardiff,Cardiff & Vale UHB,"8,740",14.1,29.0,0.0
+W97023,Cardiff South West,Cardiff,Cardiff & Vale UHB,"7,126",17.3,62.2,10.3
+W97024,Cardiff West,Cardiff,Cardiff & Vale UHB,"8,519",19.1,0.2,0.0
+W97025,Cardiff North,Cardiff,Cardiff & Vale UHB,"7,398",10.3,8.9,0.0
+W97027,Cardiff East,Cardiff,Cardiff & Vale UHB,"15,303",17.2,58.7,0.1
+W97028,Cardiff West,Cardiff,Cardiff & Vale UHB,"7,030",19.4,7.9,0.0
+W97029,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"5,168",9.4,77.1,0.1
+W97031,Cardiff South West,Cardiff,Cardiff & Vale UHB,"6,231",15.3,42.7,0.0
+W97032,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"11,788",15.6,63.3,0.9
+W97033,Cardiff North,Cardiff,Cardiff & Vale UHB,"10,904",14.0,11.7,0.0
+W97034,Cardiff North,Cardiff,Cardiff & Vale UHB,"9,910",11.5,10.6,0.0
+W97036,Cardiff West,Cardiff,Cardiff & Vale UHB,"6,094",14.6,25.4,0.0
+W97038,Western Vale,Vale of Glamorgan,Cardiff & Vale UHB,"6,556",23.3,1.1,45.6
+W97040,Cardiff South West,Cardiff,Cardiff & Vale UHB,"13,197",13.2,80.9,1.9
+W97041,Cardiff North,Cardiff,Cardiff & Vale UHB,"7,476",12.0,6.9,0.0
+W97044,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"6,815",9.3,75.5,0.1
+W97045,Western Vale,Vale of Glamorgan,Cardiff & Vale UHB,"11,193",22.1,16.6,5.9
+W97046,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"6,727",18.7,63.5,1.4
+W97047,Cardiff West,Cardiff,Cardiff & Vale UHB,"9,386",20.8,51.2,5.0
+W97048,Cardiff South East,Cardiff,Cardiff & Vale UHB,"11,225",9.9,73.7,0.0
+W97049,Cardiff East,Cardiff,Cardiff & Vale UHB,"10,267",14.4,85.9,0.0
+W97052,Western Vale,Vale of Glamorgan,Cardiff & Vale UHB,"9,544",20.5,11.8,29.8
+W97053,Cardiff North,Cardiff,Cardiff & Vale UHB,"7,049",17.1,7.5,0.0
+W97055,Eastern Vale,Vale of Glamorgan,Cardiff & Vale UHB,"9,099",24.7,1.3,1.5
+W97056,Cardiff South East,Cardiff,Cardiff & Vale UHB,"5,720",4.5,20.8,0.0
+W97057,Eastern Vale,Vale of Glamorgan,Cardiff & Vale UHB,"6,346",17.7,1.3,0.0
+W97058,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"7,041",17.9,59.5,1.1
+W97059,Cardiff West,Cardiff,Cardiff & Vale UHB,"4,301",16.9,17.9,0.0
+W97060,Cardiff South East,Cardiff,Cardiff & Vale UHB,"8,323",11.9,71.5,0.3
+W97061,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"7,959",11.7,76.9,0.0
+W97062,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"3,483",21.6,13.3,1.0
+W97063,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"3,708",12.1,74.4,0.1
+W97064,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"7,153",17.7,42.2,2.8
+W97065,Cardiff North,Cardiff,Cardiff & Vale UHB,"9,710",7.8,30.0,0.9
+W97067,Cardiff South West,Cardiff,Cardiff & Vale UHB,"4,332",8.7,22.9,0.1
+W97068,Cardiff South West,Cardiff,Cardiff & Vale UHB,"2,874",17.4,77.8,3.1
+W97069,Cardiff East,Cardiff,Cardiff & Vale UHB,"4,836",8.9,50.6,0.0
+W97286,Cardiff West,Cardiff,Cardiff & Vale UHB,"5,069",14.0,30.6,0.0
+W97291,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"5,988",4.7,50.6,0.0
+W97294,Cardiff West,Cardiff,Cardiff & Vale UHB,"5,498",16.9,17.7,0.0
+W97296,Cardiff South West,Cardiff,Cardiff & Vale UHB,"7,871",7.3,32.4,0.1
+W97299,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"4,248",8.1,82.8,0.0
+W97611,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"7,074",11.6,64.6,1.1
+W97614,Central Vale,Vale of Glamorgan,Cardiff & Vale UHB,"5,597",17.9,45.8,2.6
+W97616,City & Cardiff South,Cardiff,Cardiff & Vale UHB,"2,981",12.2,85.6,0.0
+W97619,Cardiff West,Cardiff,Cardiff & Vale UHB,"6,585",14.5,13.2,0.6
+W97623,Cardiff South West,Cardiff,Cardiff & Vale UHB,"2,533",7.7,90.2,0.7
+W98001,Upper Valleys,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"11,694",19.2,40.8,0.2
+W98002,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"10,043",20.2,46.1,0.4
+W98003,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"8,066",18.1,57.2,0.1
+W98004,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"7,214",15.9,52.9,0.2
+W98005,Cwmtawe,Swansea,Abertawe Bro Morgannwg UHB,"10,436",15.1,32.6,0.0
+W98006,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"10,716",22.6,36.9,0.4
+W98007,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"6,434",17.3,62.5,0.6
+W98008,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"8,473",17.8,31.7,9.5
+W98010,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"7,869",21.4,36.0,0.0
+W98012,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"12,044",22.1,14.4,8.0
+W98013,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"8,915",19.0,28.0,12.3
+W98015,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"4,838",10.2,77.6,0.1
+W98016,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"8,794",24.9,50.8,0.6
+W98017,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"2,865",22.1,97.3,0.6
+W98018,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"4,940",18.4,47.1,0.1
+W98019,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"3,371",20.4,64.7,18.7
+W98020,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"4,894",21.6,48.5,0.4
+W98021,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"21,308",23.4,7.6,0.9
+W98022,Cwmtawe,Swansea,Abertawe Bro Morgannwg UHB,"10,574",20.1,56.0,9.5
+W98023,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"7,489",17.9,27.0,0.1
+W98024,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"6,449",24.5,45.5,0.5
+W98026,Cwmtawe,Swansea,Abertawe Bro Morgannwg UHB,"6,975",20.3,46.6,0.6
+W98027,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"10,232",13.6,63.7,0.1
+W98028,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"7,404",16.1,62.8,0.2
+W98029,Cwmtawe,Swansea,Abertawe Bro Morgannwg UHB,"7,965",21.0,37.2,0.6
+W98030,Upper Valleys,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"5,985",22.2,54.6,32.2
+W98031,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"9,974",20.6,73.8,7.5
+W98032,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"9,412",20.4,70.2,2.4
+W98033,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"7,683",32.6,12.4,3.3
+W98034,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"10,330",20.7,31.9,10.3
+W98035,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"8,570",21.7,71.4,2.4
+W98036,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"8,101",22.6,52.0,0.6
+W98039,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"4,007",14.1,75.2,0.2
+W98040,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"5,861",22.3,60.8,0.1
+W98041,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"6,165",15.7,73.5,1.5
+W98043,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"6,134",20.1,46.6,0.2
+W98044,Cwmtawe,Swansea,Abertawe Bro Morgannwg UHB,"6,845",16.6,46.5,1.2
+W98045,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"6,420",29.1,0.5,64.3
+W98046,Upper Valleys,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"9,459",22.5,57.9,9.7
+W98048,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"4,767",16.2,30.2,0.0
+W98049,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"9,304",22.4,8.4,1.1
+W98051,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"2,419",18.4,99.7,0.1
+W98053,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"9,166",0.3,10.8,0.0
+W98055,BayHealth,Swansea,Abertawe Bro Morgannwg UHB,"3,740",27.6,8.2,1.5
+W98056,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"4,708",15.4,65.9,0.0
+W98057,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"6,450",12.1,68.6,0.3
+W98608,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"2,924",12.8,69.0,0.4
+W98610,CityHealth,Swansea,Abertawe Bro Morgannwg UHB,"1,660",19.3,48.1,2.9
+W98612,Penderi,Swansea,Abertawe Bro Morgannwg UHB,"2,208",11.8,71.8,1.0
+W98627,Afan,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"2,207",20.9,64.7,37.7
+W98785,Neath,Neath Port Talbot,Abertawe Bro Morgannwg UHB,"2,509",17.3,56.0,0.7
+W98787,Llwchwr,Swansea,Abertawe Bro Morgannwg UHB,"5,019",17.0,28.7,7.9
