@@ -6,6 +6,10 @@
 /r_notebooks/*.html
 *.png
 
+# Large files
+oral_anticoagulants.rds
+oral_contraceptives.rds
+
 # History files
 .Rhistory
 .Rapp.history
