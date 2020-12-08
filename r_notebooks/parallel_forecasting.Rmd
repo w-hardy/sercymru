@@ -16,7 +16,6 @@ library(prophet)
 library(fable)
 library(fable.prophet)
 library(feasts)
-library(fasster)
 library(furrr)
 library(knitr)
 
@@ -36,24 +35,81 @@ source("../r_scripts/functions.r")
 # Data ####
 
 ## Read from local file
-gp <- read_rds("../data/gp_linked_na_omit.rds")
+#gp <- read_rds("../data/gp_linked_na_omit.rds")
+gp <- read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL) %>% 
+  filter(year == 2020) # do something better
 oc <- read_rds("../data/oral_contraceptives.rds") 
 
+
 ## Sort into monthly count data
+oc_monthly_count <- oc %>% 
+  group_by(datename) %>% 
+  summarise(n = sum(Quantity)) %>% 
+  mutate(datename = yearmonth(datename),
+         n = case_when(str_detect(datename, pattern = "Jan") ~ n/31,
+                       str_detect(datename, pattern = "Feb") ~ n/28.25,
+                       str_detect(datename, pattern = "Mar") ~ n/31,
+                       str_detect(datename, pattern = "Apr") ~ n/30,
+                       str_detect(datename, pattern = "May") ~ n/31,
+                       str_detect(datename, pattern = "Jun") ~ n/30,
+                       str_detect(datename, pattern = "Jul") ~ n/31,
+                       str_detect(datename, pattern = "Aug") ~ n/31,
+                       str_detect(datename, pattern = "Sep") ~ n/30,
+                       str_detect(datename, pattern = "Oct") ~ n/31,
+                       str_detect(datename, pattern = "Nov") ~ n/30,
+                       str_detect(datename, pattern = "Dec") ~ n/31)) %>% 
+  ungroup() %>% 
+  as_tsibble(index = datename)
+colnames(gp)
+
+oc_monthly_quantity_hb <- 
+  right_join(oc, select(gp, c(practiceid, hboard)), 
+             by = c("PracticeID" = "practiceid")) %>%
+  countRegional(hboard, datename, Quantity) %>% 
+  left_join(gp %>% 
+  select(c(practiceid, npat, hboard)) %>% 
+  group_by(hboard) %>% 
+  summarise(npat = sum(npat)), by = c("regional_unit" = "hboard")) %>% 
+  mutate(n = 1000*n/npat) # quantity per 1000 pts
+
+oc_monthly_quantity_cluster <- 
+  right_join(oc, select(gp, c(practiceid, cluster)), 
+             by = c("PracticeID" = "practiceid")) %>%
+  countRegional(cluster, datename, Quantity) %>% 
+  left_join(gp %>% 
+  select(c(practiceid, npat, cluster)) %>% 
+  group_by(cluster) %>% 
+  summarise(npat = sum(npat)), by = c("regional_unit" = "cluster")) %>% 
+  mutate(n = 1000*n/npat) # quantity per 1000 pts
 
 oc_monthly_quantity_gp <- 
   countRegional(oc, PracticeID, datename, Quantity) %>% 
-  right_join(gp, by = c("regional_unit" = "PracticeID")) %>% # want to have GPs which have recorded data for the duration, not just part of it as that would add noise
-  mutate(n = 1000*n/npat) # quantity per 1000 pts
+  right_join(select(gp, c(practiceid, npat)), 
+            by = c("regional_unit" = "practiceid")) %>% 
+  mutate(n = 1000*n/npat)
+  
 
 ## Sort into monthly count data pre-lockdown (2020-03-23)
+oc_monthly_count_pre_cv19 <- 
+  oc_monthly_count %>% 
+  filter(datename < dmy("01-03-2020"))
+
+oc_monthly_quantity_hb_pre_cv19 <- 
+  oc_monthly_quantity_hb %>% 
+    filter(datename < dmy("01-03-2020"))
+
+oc_monthly_quantity_cluster_pre_cv19 <- 
+  oc_monthly_quantity_cluster %>% 
+    filter(datename < dmy("01-03-2020"))
 
 oc_monthly_quantity_gp_pre_cv19 <- 
   oc_monthly_quantity_gp %>% 
     filter(datename < dmy("01-03-2020"))
 
 ## Smaller GP data set to develop process
-regions <- unique(as.character(gp$PracticeID))
+regions <- unique(as.character(gp$practiceid))
 dev_data <- 
   oc_monthly_quantity_gp_pre_cv19 %>% 
   filter(regional_unit %in% sample(regions, 5))
@@ -201,12 +257,16 @@ proph_fits2 %>%
   kable(digits = 2)
 ```
 
+### future_map()
+
 ##### multisession
+
 ```{r, eval=FALSE}
 plan(multisession)
 
-system.time(proph_fit2 <- map_dfr(.x = unique(dev_data$regional_unit), 
-             .f = ~regionalProphetFits(dev_data, .x)))
+system.time(proph_fit2 <- future_map_dfr(.x = unique(dev_data$regional_unit), 
+             .f = ~regionalProphetFits(dev_data, .x),
+            .options = furrr_options(seed = TRUE)))
 
 proph_fits2 <- accuracy(proph_fit2) %>% 
   group_by(regional_unit) %>% 
@@ -217,6 +277,20 @@ proph_fits2 %>%
 plan(sequential)
 
 ```
+
+* 2020-12-07 Fails:
+
+```
+1 error encountered for oc_prophet_model1
+[1] unable to load shared object '/Library/Frameworks/R.framework/Versions/4.0/Resources/library/prophet/libs/prophet.so':
+  dlopen(/Library/Frameworks/R.framework/Versions/4.0/Resources/library/prophet/libs/prophet.so, 6): Library not loaded: @rpath/libtbb.dylib
+  Referenced from: /Library/Frameworks/R.framework/Versions/4.0/Resources/library/prophet/libs/prophet.so
+  Reason: image not found
+```
+
+* 2020-12-08 Fixed
+  * Reinstalling using `install.packages("prophet", type="source")` has resolved problem.
+  * Need to test in Windows
 
 #### Multi core
 
