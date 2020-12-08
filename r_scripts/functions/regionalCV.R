@@ -43,6 +43,7 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
       accuracy(data_test)
   }
 
+  plan(multisession) # Set up parallel processing to decrease computation time
   # Prophet models won't run with plan(multisession) so need to be run
   # sequentially. Is it worth trying to write this in Python and pass it back
   # to R?
@@ -50,18 +51,18 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
     # Probably worth trying the prophet::cross_validation() method. If it
     # returns RMSE and is faster it will be useful.
   prophet_fits <-
-    map_dfr(.x =  regions,
-            .f = ~prophetCV(data = filter(data, regional_unit == .x)))
+    future_map_dfr(.x =  regions,
+            .f = ~prophetCV(data = filter(data, regional_unit == .x)),
+            .options = furrr_options(seed = TRUE))
   message("prophetModels() complete")
 
   # Fable models will run using plan(multisession), but need to be run as below
   # with `furrr_options(seed = TRUE)` otherwise improper random numbers are
   # generated
-  plan(multisession) # Set up parallel processing to decrease computation time
   fable_fits <-
     future_map_dfr(.x =  regions,
                    .f = ~fableCV(data = filter(data, regional_unit == .x)),
-                   furrr_options(seed = TRUE))
+                   .options = furrr_options(seed = TRUE))
   plan(sequential) # Close the multiprocess function to prevent memory leakage
   message("fableModels() complete")
 
