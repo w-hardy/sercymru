@@ -28,7 +28,11 @@ regionalJointFcsts <- function(data, h ="5 months"){
   message("prophet forecasts")
   plan(sequential)
 
+<<<<<<< HEAD
   # prophetModels now being run in parallel. Needed to reinstall prophet from
+=======
+  # prophetModels now being run in parallel. Needed to reinstall proophet from
+>>>>>>> 3803eb99c31ac84a5d2cc9211e7c43700fcf4b8e
   # source
 
   joint_fit <-
