@@ -1,8 +1,6 @@
 regionalJointFcsts <- function(data, h ="5 months"){
   regions <- unique(data$regional_unit)
-  message("1")
   plan(multisession)
-  message("2")
   fable_fit <-
     future_map_dfr(.x = regions,
                    .f = ~fableModels(filter(data, regional_unit ==.x)),
@@ -14,19 +12,24 @@ regionalJointFcsts <- function(data, h ="5 months"){
     as_tibble()
   message("fable forecasts")
 
-  plan(sequential)
 
   prophet_fit <-
-    map_dfr(.x = regions,
-            .f = ~prophetModels(filter(data, regional_unit ==.x)))
+    future_map_dfr(.x = regions,
+                   .f = ~prophetModels(filter(data, regional_unit ==.x)),
+                   .options = furrr_options(seed = TRUE))
   message("prophet fits")
 
-  prophet_fcst <- forecast(prophet_fit, h = h) %>%
+  prophet_fcst <-
+    forecast(prophet_fit, h = h) %>%
     as_tibble()
-# Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
+  # Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
   # This may also be influencing accuracy
 
-    message("prophet forecasts")
+  message("prophet forecasts")
+  plan(sequential)
+
+  # prophetModels now being run in parallel. Needed to reinstall prophet from
+  # source
 
   joint_fit <-
     left_join(fable_fit, prophet_fit, by = "regional_unit")
