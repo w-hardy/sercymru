@@ -5,13 +5,13 @@ serCymruTools/
 /OneDrive/_*/
 /OneDrive/4_outputs
 /OneDrive/5_reporting/
-*.sqlite
 /r_notebooks/*.html
+*.sqlite
 *.png
+*.tgz
 
-# Large files
-oral_anticoagulants.rds
-oral_contraceptives.rds
+# Data files
+data/
 
 # History files
 .Rhistory
