@@ -5,19 +5,19 @@ regionalJointFcsts <- function(data, h ="5 months"){
     future_map_dfr(.x = regions,
                    .f = ~fableModels(filter(data, regional_unit ==.x)),
                    .options = furrr_options(seed = TRUE))
-  message("fable fits")
+  message("fable fits complete")
 
   fable_fcst <- fable_fit %>%
     forecast(h = h) %>%
     as_tibble()
-  message("fable forecasts")
+  message("fable forecasts complete")
 
 
   prophet_fit <-
     future_map_dfr(.x = regions,
                    .f = ~prophetModels(filter(data, regional_unit ==.x)),
                    .options = furrr_options(seed = TRUE))
-  message("prophet fits")
+  message("prophet fits complete")
 
   prophet_fcst <-
     forecast(prophet_fit, h = h) %>%
@@ -25,7 +25,7 @@ regionalJointFcsts <- function(data, h ="5 months"){
   # Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
   # This may also be influencing accuracy
 
-  message("prophet forecasts")
+  message("prophet forecasts complete")
   plan(sequential)
   # prophetModels now being run in parallel. Needed to reinstall prophet from
   # source

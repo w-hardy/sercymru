@@ -355,10 +355,10 @@ system.time(oac_gp_fcsts <-
               filter(!regional_unit %in% incomplete_gp) %>%
               regionalJointFcsts())
 oac_gp_fcsts %>%
-  write_rds("../data/oac_gp_fcsts.rds")
+  write_rds("../data/oac_gp_fcsts_1.rds")
 
 oac_gp_cluster_fcsts <- 
-  read_rds("../data/oac_gp_fcsts.rds")
+  read_rds("../data/oac_gp_fcsts_1.rds")
 ```
 
 
@@ -457,7 +457,7 @@ best_model_gp <-
 
 best_model_gp %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_gp_fcsts$forecasts,
+  inner_join(mutate(oac_gp_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_monthly_quantity_gp, 
