@@ -1,5 +1,5 @@
 ---
-title: "Oral contraceptives"
+title: "Oral anticoagulants"
 output: 
   html_document:
     code_folding: hide
@@ -9,6 +9,7 @@ output:
 
 ```{r setup}
 ## Packages
+# devtools::install_github("https://github.com/w-hardy/serCymruTools")
 library(tidyverse)
 library(lubridate)
 library(tsibble)
@@ -18,6 +19,7 @@ library(fable)
 library(fable.prophet)
 library(feasts)
 library(furrr)
+library(serCymruTools)
 
 ## Options
 knitr::opts_chunk$set(cache = TRUE)
@@ -27,68 +29,6 @@ rstan_options(auto_write = TRUE)
 ## Seed
 set.seed(32)
 
-## Functions
-countRegional <- function(data, region, datename = datename, unit = Quantity){
- # Function to create tsibble object for a count of `unit` per `datename`
-  # e.g. countRegional(oac, Locality, datename, Quantity) is the `Quantity`
-  # per `datename` grouped by `Locality` from `oac`. `Quantity` is corrected for
-  # the number of days in each month.
-  region <- enquo(region)
-  datename <- enquo(datename)
-  unit <- enquo(unit)
-  
-  data %>% 
-  mutate(regional_unit = as_factor(set_names(!!region))) %>% 
-  group_by(regional_unit, !!datename) %>% 
-  summarise(n = sum(!!unit),
-            npat = sum(npat)) %>% 
-  mutate(n = case_when(str_detect(!!datename, pattern = "-01-") ~ n/31,
-                       str_detect(!!datename, pattern = "-02-") ~ n/28.25,
-                       str_detect(!!datename, pattern = "-03-") ~ n/31,
-                       str_detect(!!datename, pattern = "-04-") ~ n/30,
-                       str_detect(!!datename, pattern = "-05-") ~ n/31,
-                       str_detect(!!datename, pattern = "-06-") ~ n/30,
-                       str_detect(!!datename, pattern = "-07-") ~ n/31,
-                       str_detect(!!datename, pattern = "-08-") ~ n/31,
-                       str_detect(!!datename, pattern = "-09-") ~ n/30,
-                       str_detect(!!datename, pattern = "-10-") ~ n/31,
-                       str_detect(!!datename, pattern = "-11-") ~ n/30,
-                       str_detect(!!datename, pattern = "-12-") ~ n/31)) %>% 
-  ungroup() %>% 
-  as_tsibble(index = !!datename, key = regional_unit)
-}
-
-regionalPlot <- function(region, data){
-  
-  ## Prophet forecast - can this be taken outside of the function?
-      ## no, when it is taken outside of the model, the forecast is becomes 
-      ## much worse 2020-11-14
-  df <- data %>%
-    filter(regional_unit == region & datename < ymd("2020-03-23")) %>%
-    transmute(ds = datename, y = n)
-
-  m <- prophet::prophet(df, holidays = holidays,
-                        seasonality.mode = "additive",# mcmc.samples = 1000,
-                        weekly.seasonality = FALSE, daily.seasonality = FALSE)
-  future <- make_future_dataframe(m, periods = 5, freq = 'month')
-  fcst <- predict(m, future)
-
-  ## Plotting
-  plot <- fcsts %>% 
-    filter(regional_unit == region) %>% 
-    fabletools::autoplot(data, level = 80) + # fable forecasts over observed data
-    geom_line(aes(y = c(rep(NA,50), fcst[51:55,]$yhat)), # prophet prediction
-              col = "blue", lty = 3) +
-    geom_ribbon(aes(ymin = c(rep(NA,50), fcst[51:55,]$yhat_lower), # prophet confidence
-                    ymax = c(rep(NA,50), fcst[51:55,]$yhat_upper)),
-                alpha = .3, fill = "blue") +
-  geom_vline(xintercept = dmy("23-March-2020"), colour = "red") + # add line to mark the start of lockdown
-    labs(title = region)
-  
-  ## Results
-  result <- list("plots" = plot)#, "prophet" = fcst)
-  return(result)
-}
 ```
 
 ## Preparing data
@@ -116,7 +56,10 @@ oral_anticoagulants <-
 #   write_rds("../data/oral_anticoagulants.rds")
 
 ## Read from local file
-gp <- read_rds("../data/gp_linked_na_omit.rds")
+gp <- read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL) %>% 
+  filter(year == 2020) # do something better
 oac <- read_rds("../data/oral_anticoagulants.rds") 
 
 ## Sort into monthly count data
@@ -135,26 +78,34 @@ oac_monthly_count <- oac %>%
                        str_detect(datename, pattern = "Sep") ~ n/30,
                        str_detect(datename, pattern = "Oct") ~ n/31,
                        str_detect(datename, pattern = "Nov") ~ n/30,
-                       str_detect(datename, pattern = "Dec") ~ n/31
-                             )) %>% 
+                       str_detect(datename, pattern = "Dec") ~ n/31)) %>% 
   ungroup() %>% 
   as_tsibble(index = datename)
 
-oac_monthly_quantity_locality <- 
-  right_join(oac, select(gp, c(PracticeID, npat, GPCluster)), 
-             by = c("PracticeID" = "PracticeID")) %>%
-  countRegional(., Locality, datename, Quantity)
+oac_monthly_quantity_hb <- 
+  right_join(oac, select(gp, c(practiceid, hboard)), 
+             by = c("PracticeID" = "practiceid")) %>%
+  countRegional(hboard, datename, Quantity) %>% 
+  left_join(gp %>% 
+  select(c(practiceid, npat, hboard)) %>% 
+  group_by(hboard) %>% 
+  summarise(npat = sum(npat)), by = c("regional_unit" = "hboard")) %>% 
+  mutate(n = 1000*n/npat) # quantity per 1000 pts
 
 oac_monthly_quantity_cluster <- 
-  right_join(oac, select(gp, c(PracticeID, npat, GPCluster)), 
-             by = c("PracticeID" = "PracticeID")) %>%
-  countRegional(., GPCluster, datename, Quantity) %>% 
+  right_join(oac, select(gp, c(practiceid, cluster)), 
+             by = c("PracticeID" = "practiceid")) %>%
+  countRegional(cluster, datename, Quantity) %>% 
+  left_join(gp %>% 
+  select(c(practiceid, npat, cluster)) %>% 
+  group_by(cluster) %>% 
+  summarise(npat = sum(npat)), by = c("regional_unit" = "cluster")) %>% 
   mutate(n = 1000*n/npat) # quantity per 1000 pts
 
 oac_monthly_quantity_gp <- 
-    right_join(oac, select(gp, c(PracticeID, npat, GPCluster)), 
-             by = c("PracticeID" = "PracticeID")) %>% 
-  countRegional(., PracticeID, datename, Quantity)%>% 
+  countRegional(oac, PracticeID, datename, Quantity) %>% 
+  right_join(select(gp, c(practiceid, npat)), 
+            by = c("regional_unit" = "practiceid")) %>% 
   mutate(n = 1000*n/npat)
   
 
@@ -163,8 +114,8 @@ oac_monthly_count_pre_cv19 <-
   oac_monthly_count %>% 
   filter(datename < dmy("01-03-2020"))
 
-oac_monthly_quantity_locality_pre_cv19 <- 
-  oac_monthly_quantity_locality %>% 
+oac_monthly_quantity_hb_pre_cv19 <- 
+  oac_monthly_quantity_hb %>% 
     filter(datename < dmy("01-03-2020"))
 
 oac_monthly_quantity_cluster_pre_cv19 <- 
@@ -175,6 +126,7 @@ oac_monthly_quantity_gp_pre_cv19 <-
   oac_monthly_quantity_gp %>% 
     filter(datename < dmy("01-03-2020"))
 
+
 ```
 
 
@@ -182,7 +134,7 @@ oac_monthly_quantity_gp_pre_cv19 <-
 
 ### 2016-2020 plot of all oac prescriptions 
 
-```{r oac-monthly-ts-plot, fig.cap="Total quantity of combined hormonal and progestogen only oral contraceptives prescribed per month."}
+```{r oac-monthly-ts-plot, fig.cap="Total quantity of combined oral anticoagulants prescribed per month."}
 oac %>% 
   group_by(datename) %>% 
   summarise(n = sum(Quantity)) %>% 
@@ -191,9 +143,6 @@ oac %>%
   geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
 ```
 
-* General negative trend
-* Seasonality unclear
-  * Holiday effect? Drop in prescribing in Dec 2016-2019 followed by peak in Jan for 2017-2020.
 
 ### Seasonality
 
@@ -225,26 +174,6 @@ oac_monthly_count_pre_cv19 %>%
   gg_subseries(y = n, period = "year")
 ```
 
-* 
-
-### By `Quantity`
-
-* 
-
-### By `Items`
-
-* 
-
-### Lag plots
-
-```{r}
-oac_monthly_count_pre_cv19 %>%
-  mutate(datename = yearmonth(datename)) %>% 
-  gg_lag(y = n, geom = "point", lags = 1:12)
-```
-
-* Here the colours indicate the month of the variable on the y-axis. The relationship is strongest at lag 3, 6, 9, and 12 suggesting seasonal data
-
 
 ### Autocorrelation
 
@@ -268,362 +197,279 @@ oac_monthly_count_pre_cv19$n %>%
 ```
 
 
-## Time series components
-
-```{r}
-dcmp <- 
-  oac_monthly_count_pre_cv19 %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  model(STL(n))
-
-oac_monthly_count_pre_cv19 %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  autoplot(n, color = "grey") + 
-  autolayer(components(dcmp), trend, color = "red")
-
-components(dcmp) %>% 
-  autoplot()
-```
-
-```{r}
-oac_monthly_count %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  autoplot(n, color = "grey") + 
-  autolayer(components(dcmp), season_adjust, colour = "blue") +
-  labs(title = "Seasonally adjusted")
-```
-
-## Moving average
-
-```{r}
-df <- oac_monthly_count %>% 
-  mutate(datename = yearmonth(datename),
-         `5-MA` = slider::slide_dbl(n, mean, .before = 2, .after = 2, 
-                                    .complete = TRUE),
-         `12-MA` = slider::slide_dbl(n, mean, .before = 5, .after = 6, 
-                                    .complete = TRUE),
-         `2x12-MA` = slider::slide_dbl(`12-MA`, mean, .before = 2, .after = 2, 
-                                    .complete = TRUE),
-         )
-df %>% 
-  autoplot(n) + 
-  autolayer(df, `5-MA`, colour = "red") +
-  autolayer(df, `2x12-MA`, colour = "blue") +
-  labs(caption = "Daily prescriptions (black) along with the 5-MA estimate of the trend-cycle (red) and 2x12-MA (blue).")
-```
-
-
-## Predictions by `Locality`
-
-```{r}
-regions <- unique(as.character(oac_monthly_quantity_locality$regional_unit))
-holidays <- 
-  bind_rows(tibble(holiday = "christmas",
-                   ds = as.Date(c("2016-12-25", "2017-12-25", "2018-12-25",
-                                  "2019-12-25", "2020-12-25", "2021-12-25")),
-                   lower_window = -1, 
-                   upper_window = 1),
-            
-            tibble(holiday = "easter",
-                   ds = as.Date(c("2016-03-27", "2017-04-16", "2018-04-01",
-                                  "2019-04-21", "2020-04-12", "2021-04-04")),
-                   lower_window = -1, 
-                   upper_window = 1))
-
-
-fit <- oac_monthly_quantity_locality_pre_cv19 %>% 
-  # filter(year(datename) > 2016) %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  model(#trend_model1 = TSLM(n ~ trend()),#time series linear model
-        trend_model2 = TSLM(n ~ trend() + season()),
-        #ets1 = ETS(n ~ trend()),
-        ets2 = ETS(n ~ trend() + season()),
-        arima = ARIMA(n),# stepwise = FALSE, approximation = FALSE),
-        #comb1 = combination_model(TSLM(n ~ trend()), ETS(n ~ trend())),
-        comb2 = combination_model(TSLM(n ~ trend() + season()), 
-                                  ETS(n ~ trend() + season())),
-        # stl_dcmp1 = decomposition_model(STL(n ~ trend(),
-        #                                    iterations = 1000, robust = FALSE),
-        #                                NAIVE(season_adjust)),
-        stl_dcmp2 = decomposition_model(STL(n ~ trend() + season(),
-                                            iterations = 1000, robust = FALSE),
-        SNAIVE(season_adjust)),
-        s_naive = SNAIVE(n)
-  ) 
-
-fcsts <-  fit %>% 
-  forecast(h = "6 months", bootstrap = FALSE) # can use `times = x` to control the number of samples
-
-# single thread
-regional_plots <- 
-  map(.x = regions, 
-      .f = ~regionalPlot(.x, oac_monthly_quantity_locality))
-
-regional_plots
-
-left_join(accuracy(fit),
-          fit %>% 
-            select(-starts_with(c("stl_dcmp", "comb"))) %>% 
-            report(), 
-by = c("regional_unit", ".model"))
-
-
-fit %>% 
-  accuracy() %>% 
-  group_by(.model) %>% 
-  summarise(across(is.numeric, .fns = ~mean(., na.rm = TRUE)))
-
-
-```
-
-* https://fabletools.tidyverts.org/reference/combination_model.html
-
-
-
-
-### Residual diagnostics
-
-```{r}
-augment(fit) %>% 
-  features(.resid, box_pierce, lag = 24, dof = 0) %>% 
-  mutate(sig = if_else(bp_pvalue <.05, TRUE, FALSE))
-```
-
-
-## Predictions by `GPCluster`
-
-
-```{r}
-regions <- unique(as.character(gp$GPCluster))
-holidays <- 
-  bind_rows(tibble(holiday = "christmas",
-                   ds = as.Date(c("2016-12-25", "2017-12-25", "2018-12-25",
-                                  "2019-12-25", "2020-12-25", "2021-12-25")),
-                   lower_window = -1, 
-                   upper_window = 1),
-            
-            tibble(holiday = "easter",
-                   ds = as.Date(c("2016-03-27", "2017-04-16", "2018-04-01",
-                                  "2019-04-21", "2020-04-12", "2021-04-04")),
-                   lower_window = -1, 
-                   upper_window = 1))
-
-fit <- oac_monthly_quantity_cluster_pre_cv19 %>% 
-    filter(regional_unit %in% gp$GPCluster) %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  model(#trend_model1 = TSLM(n ~ trend()),#time series linear model
-        trend_model2 = TSLM(n ~ trend() + season()),
-        ets2 = ETS(n ~ trend() + season()),
-        arima = ARIMA(n),# stepwise = FALSE, approximation = FALSE),
-
-        comb2 = combination_model(TSLM(n ~ trend() + season()), 
-                                  ETS(n ~ trend() + season())),
-        stl_dcmp2 = decomposition_model(STL(n ~ trend() + season(),
-                                            iterations = 1000, robust = FALSE),
-        SNAIVE(season_adjust)),
-        # s_naive = SNAIVE(n)
-  ) 
-
-fcsts <-  fit %>% 
-  forecast(h = "5 months", bootstrap = FALSE) # can use `times = x` to control the number of samples
-
-# single thread
-regional_plots <- 
-  map(.x = regions, 
-      .f = ~regionalPlot(.x, filter(oac_monthly_quantity_cluster, 
-                                    regional_unit %in% oac_monthly_quantity_cluster$regional_unit)))
-
-regional_plots
-
-left_join(accuracy(fit),
-          fit %>% 
-            select(-starts_with(c("stl_dcmp", "comb"))) %>% 
-            report(), 
-by = c("regional_unit", ".model"))
-
-
-fit %>% 
-  accuracy() %>% 
-  group_by(.model) %>% 
-  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
-
-```
-
-
-### Residual diagnostics
-
-```{r}
-augment(fit) %>% 
-  features(.resid, box_pierce, lag = 24, dof = 0) %>% 
-  mutate(sig = if_else(bp_pvalue <.05, TRUE, FALSE))
-```
-
-
-
-
-## Predictions by `PracticeID`
-
-
-```{r}
-regions <- unique(as.character(gp$PracticeID))
-holidays <- 
-  bind_rows(tibble(holiday = "christmas",
-                   ds = as.Date(c("2016-12-25", "2017-12-25", "2018-12-25",
-                                  "2019-12-25", "2020-12-25", "2021-12-25")),
-                   lower_window = -1, 
-                   upper_window = 1),
-            
-            tibble(holiday = "easter",
-                   ds = as.Date(c("2016-03-27", "2017-04-16", "2018-04-01",
-                                  "2019-04-21", "2020-04-12", "2021-04-04")),
-                   lower_window = -1, 
-                   upper_window = 1))
-
-fit <- oac_monthly_quantity_gp_pre_cv19 %>% 
-    filter(regional_unit %in% gp$PracticeID) %>% 
-  mutate(datename = yearmonth(datename)) %>% 
-  model(#trend_model1 = TSLM(n ~ trend()),#time series linear model
-        trend_model2 = TSLM(n ~ trend() + season()),
-        ets2 = ETS(n ~ trend() + season()),
-        arima = ARIMA(n),# stepwise = FALSE, approximation = FALSE),
-
-        comb2 = combination_model(TSLM(n ~ trend() + season()), 
-                                  ETS(n ~ trend() + season())),
-        stl_dcmp2 = decomposition_model(STL(n ~ trend() + season(),
-                                            iterations = 1000, robust = FALSE),
-        SNAIVE(season_adjust)),
-        # s_naive = SNAIVE(n)
-  ) 
-
-fcsts <-  fit %>% 
-  forecast(h = "5 months", bootstrap = FALSE) # can use `times = x` to control the number of samples
-
-# single thread
-regional_plots <- 
-  map(.x = regions, 
-      .f = ~regionalPlot(.x, filter(oac_monthly_quantity_gp, 
-                                    regional_unit %in% gp$PracticeID)))
-
-regional_plots
-
-left_join(accuracy(fit),
-          fit %>% 
-            select(-starts_with(c("stl_dcmp", "comb"))) %>% 
-            report(), 
-by = c("regional_unit", ".model"))
-
-
-fit %>% 
-  accuracy() %>% 
-  group_by(.model) %>% 
-  summarise(across(where(is.numeric), .fns = ~mean(., na.rm = TRUE)))
-
-
-
-```
-
-
-### Residual diagnostics
-
-```{r}
-augment(fit) %>% 
-  features(.resid, box_pierce, lag = 24, dof = 0) %>% 
-  mutate(sig = if_else(bp_pvalue <.05, TRUE, FALSE))
-```
-
-
-
-## Overview of each drug
-
-```{r}
-oac %>% 
-  group_by(datename, chemname) %>% 
-  summarise(n = sum(Quantity)) %>% 
-  mutate(n = case_when(str_detect(datename, pattern = "-01-") ~ n/31,
-                       str_detect(datename, pattern = "-02-") ~ n/28.25,
-                       str_detect(datename, pattern = "-03-") ~ n/31,
-                       str_detect(datename, pattern = "-04-") ~ n/30,
-                       str_detect(datename, pattern = "-05-") ~ n/31,
-                       str_detect(datename, pattern = "-06-") ~ n/30,
-                       str_detect(datename, pattern = "-07-") ~ n/31,
-                       str_detect(datename, pattern = "-08-") ~ n/31,
-                       str_detect(datename, pattern = "-09-") ~ n/30,
-                       str_detect(datename, pattern = "-10-") ~ n/31,
-                       str_detect(datename, pattern = "-11-") ~ n/30,
-                       str_detect(datename, pattern = "-12-") ~ n/31
-                             )) %>% 
-  as_tsibble(index = datename, key = chemname) %>% 
-  autoplot(n) +
-  # theme(legend.position = "none") +
-  geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
-```
-
-
 ## Modelling
 
-### Prophet
+### By Health Board
 
-```{r}
-# Prophet model
-oac_prophet_model <- 
-  fable.prophet::prophet(n ~ growth("linear", n_changepoints = 0) +
-                           season("year", type = "additive") + holiday(holidays))
+```{r, health-board-modelling}
+# system.time(oac_hb_cv_models <-
+#   regionalCV(data = oac_monthly_quantity_hb_pre_cv19))
+# 
+# oac_hb_cv_models %>%
+#   write_rds("../data/oac_hb_cv_models.rds")
 
-fit <- oac_monthly_quantity_locality_pre_cv19 %>% 
-  as_tsibble(index = datename) %>% 
-  model(oac_prophet_model)
+oac_hb_cv_models <- 
+  read_rds("../data/oac_hb_cv_models.rds")
 
-fc <- 
-  fit %>% 
-  forecast(h = "5 months")
+oac_hb_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  ggplot(aes(x = MAPE)) +
+  geom_histogram()
 
-accuracy(fit)
-
-df <- oac_monthly_count_pre_cv19 %>% 
-  transmute(ds = datename, y = n)
-m <- prophet::prophet(df, seasonality.mode = "additive")
-future <- make_future_dataframe(m, periods = 6, freq = 'month')
-fcst <- predict(m, future)
-prophet_plot_components(m, fcst)
-
-oac_monthly_count %>% 
-  ggplot(aes(x = datename, y = n)) +
-  geom_line() +
-  geom_ribbon(aes(ymin = c(rep(NA,50), fcst[51:55,]$yhat_lower),
-                  ymax = c(rep(NA,50), fcst[51:55,]$yhat_upper)),
-              alpha = .1, fill = "blue") +
-  geom_line(aes(y = c(fcst[1:50,]$yhat, rep(NA, 5))),
-            col = "blue", lty = 2) +
-  geom_line(aes(y = c(rep(NA,50), fcst[51:55,]$yhat)),
-            col = "blue", lty = 3) +
-  geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
-
-perf <- cross_validation(model = m, initial = 3*52, horizon = 52, units = "weeks")
-performance_metrics(perf)
-plot_cross_validation_metric(perf, metric = "rmse")
-```
-
-
-
-## Split by practice
-
-
-```{r}
-oac %>% 
-  tibble %>% 
-  group_by(datename, PracticeID) %>% 
-  count %>% 
-  group_by(PracticeID) %>% 
-  summarise(n_min = min(n), 
-            n_mean = mean(n)) %>% arrange((n_min)) %>% 
-  filter(n_min >1)
-
-
-oac %>% filter(PracticeID == "W91626") %>% 
-  group_by(datename) %>% 
+oac_hb_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  group_by(.model) %>% 
   count() %>% 
-  as_tsibble(index = datename) %>% 
-  autoplot()
+  arrange(desc(n))
+
+oac_hb_cv_models %>% 
+  group_by(regional_unit) %>% 
+  ggplot(aes(x = reorder(.model, MAPE, mean), y = MAPE)) + # reorder by mean of y
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+```
+
+* 724.044 seconds with multisession prophetModels()
+
+```{r}
+# system.time(oac_hb_fcsts <- regionalJointFcsts(oac_monthly_quantity_hb_pre_cv19))
+# 
+# oac_hb_fcsts %>%
+#   write_rds("../data/oac_hb_fcsts.rds")
+
+oac_hb_fcsts <- 
+  read_rds("../data/oac_hb_fcsts.rds")
+```
+
+* 194.071 seconds 2020-12-10
+
+
+### By GP Cluster
+
+```{r, gp-cluster-modelling}
+# system.time(oac_gp_cluster_cv_models <-
+#   regionalCV(data = oac_monthly_quantity_cluster_pre_cv19))
+# 
+# oac_gp_cluster_cv_models %>%
+#   write_rds("../data/oac_gp_cluster_cv_models.rds")
+
+oac_gp_cluster_cv_models <- 
+  read_rds("../data/oac_gp_cluster_cv_models.rds")
+
+oac_gp_cluster_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  ggplot(aes(x = MAPE)) +
+  geom_histogram()
+
+oac_gp_cluster_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  group_by(.model) %>% 
+  count() %>% 
+  arrange(desc(n))
+
+oac_gp_cluster_cv_models %>% 
+  group_by(regional_unit) %>% 
+  ggplot(aes(x = reorder(.model, MAPE, mean), y = MAPE)) + # reorder by mean of y
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+
 
 ```
 
+* 5514.279 seconds
+
+```{r}
+# system.time(oac_gp_cluster_fcsts <- regionalJointFcsts(oac_monthly_quantity_cluster_pre_cv19))
+# 
+# oac_gp_cluster_fcsts %>%
+#   write_rds("../data/oac_gp_cluster_fcsts.rds")
+
+oac_gp_cluster_fcsts <- 
+  read_rds("../data/oac_gp_cluster_fcsts.rds")
+```
+
+* 1266.126 seconds 2020-12-10
+
+
+### By Practice
+
+```{r, gp-practice-modelling}
+incomplete_gp <- oac_monthly_quantity_gp_pre_cv19 %>% 
+    as_tibble() %>% 
+    group_by(regional_unit) %>% 
+    count() %>% 
+    filter(n < 50) %>% 
+    .$regional_unit %>% 
+    unique()
+
+# system.time(oac_gp_cv_models <-
+#   oac_monthly_quantity_gp_pre_cv19 %>%
+#     filter(!regional_unit %in% incomplete_gp) %>%
+#               regionalCV())
+# 
+# oac_gp_cv_models %>%
+#   write_rds("../data/oac_gp_cv_models.rds")
+
+oac_gp_cv_models <- 
+  read_rds("../data/oac_gp_cv_models.rds")
+
+oac_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  ggplot(aes(x = MAPE)) +
+  geom_histogram()
+
+oac_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  group_by(.model) %>% 
+  count() %>% 
+  arrange(desc(n))
+
+oac_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  ggplot(aes(x = reorder(.model, MAPE, mean), y = MAPE)) + # reorder by mean of y
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+
+* 2.195e+04 seconds 2020-12-07
+* 25547.266 seconds 2020-12-09
+
+
+```{r}
+system.time(oac_gp_fcsts <-
+              oac_monthly_quantity_gp_pre_cv19 %>%
+              filter(!regional_unit %in% incomplete_gp) %>%
+              regionalJointFcsts())
+oac_gp_fcsts %>%
+  write_rds("../data/oac_gp_fcsts.rds")
+
+oac_gp_cluster_fcsts <- 
+  read_rds("../data/oac_gp_fcsts.rds")
+```
+
+
+## Discrepancies
+
+### By Health Board
+
+```{r, health-board-discrepancies}
+best_model_hb <- 
+  oac_hb_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE)
+
+best_model_hb %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oac_hb_fcsts$forecasts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oac_monthly_quantity_hb, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - .mean,
+         z_discrepancy = discrepancy/sd) %>% 
+  ggplot(aes(y = discrepancy)) +
+  geom_line(aes(x = datename, y = discrepancy, colour = as.factor(regional_unit)),
+            alpha = .8, lty = 2) +
+  geom_hline(aes(yintercept = 0), colour = "red") +
+  theme(legend.position = "none")
+```
+
+### By GP Cluster
+
+```{r, gp-cluster-discrepancies}
+best_model_gp_cluster <- 
+  oac_gp_cluster_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE)
+
+best_model_gp_cluster %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oac_gp_cluster_fcsts$forecasts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oac_monthly_quantity_cluster, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - .mean,
+         z_discrepancy = discrepancy/sd) %>% 
+  ggplot(aes(y = discrepancy)) +
+  # geom_boxplot(aes(x = as.factor(datename))) +
+  geom_line(aes(x = datename, y = discrepancy, colour = as.factor(regional_unit)),
+            alpha = .8, lty = 2) +
+  # scale_color_gradientn(colours = rainbow(100))+
+  geom_hline(aes(yintercept = 0), colour = "red") +
+  theme(legend.position = "none")
+```
+
+```{r}
+library(tidyLPA)
+best_model_gp_cluster %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oac_gp_cluster_fcsts$forecasts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oac_monthly_quantity_cluster, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - .mean,
+         z_discrepancy = discrepancy/sd)  %>%
+    select(discrepancy, regional_unit, datename) %>%
+  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
+  ungroup() %>% 
+  select(-regional_unit) %>% 
+  # estimate_profiles(n_profiles = 4, models = 1) %>% plot_profiles()
+    estimate_profiles(1:5,
+                      variances = c("equal", "varying"),
+                      covariances = c("zero", "varying")
+                      ) %>% 
+    compare_solutions(statistics = c("AIC", "BIC"))
+```
+
+
+### By GP Practice
+
+```{r, gp-practice-discrepancies}
+best_model_gp <- 
+  oac_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE)
+
+best_model_gp %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oac_gp_fcsts$forecasts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oac_monthly_quantity_gp, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - .mean,
+         z_discrepancy = discrepancy/sd) %>% 
+  ggplot(aes(y = discrepancy)) +
+  # geom_boxplot(aes(x = as.factor(datename))) +
+  geom_line(aes(x = datename, y = discrepancy, colour = as.factor(regional_unit)),
+            alpha = .8, lty = 2) +
+  geom_hline(aes(yintercept = 0), colour = "red") +
+  theme(legend.position = "none")
+```
