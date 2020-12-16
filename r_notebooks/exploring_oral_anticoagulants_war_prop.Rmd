@@ -120,10 +120,6 @@ oac_p_monthly_count <- oac_p %>%
                        str_detect(datename, pattern = "Dec") ~ n/31)) %>% 
   ungroup() %>%
     as_tsibble(index = datename)
-```
-
-
-```{r prep-data}
 
 oac_p_monthly_quantity_hb <- 
   right_join(oac_p, select(gp, c(practiceid, hboard)), 
@@ -139,7 +135,7 @@ oac_p_monthly_quantity_hb <-
 oac_p_monthly_quantity_cluster <- 
   right_join(oac_p, select(gp, c(practiceid, cluster)), 
              by = c("PracticeID" = "practiceid")) %>%
-  propRegional(cluster, datename, Quantity) %>% 
+  propRegional(cluster, datename, Quantity, bnf = warf) %>% 
   left_join(gp %>% 
   select(c(practiceid, npat, cluster)) %>% 
   group_by(cluster) %>% 
@@ -147,7 +143,7 @@ oac_p_monthly_quantity_cluster <-
   mutate(n = 1000*n/npat) # quantity per 1000 pts
 
 oac_p_monthly_quantity_gp <- 
-  propRegional(oac_p, PracticeID, datename, Quantity) %>% 
+  propRegional(oac_p, PracticeID, datename, Quantity, bnf = warf) %>% 
   right_join(select(gp, c(practiceid, npat)), 
             by = c("regional_unit" = "practiceid")) %>% 
   mutate(n = 1000*n/npat)
