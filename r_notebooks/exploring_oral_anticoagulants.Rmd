@@ -202,11 +202,13 @@ oac_monthly_count_pre_cv19$n %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-# system.time(oac_hb_cv_models <-
-#   regionalCV(data = oac_monthly_quantity_hb_pre_cv19))
-# 
-# oac_hb_cv_models %>%
-#   write_rds("../data/oac_hb_cv_models.rds")
+plan(multisession)
+system.time(oac_hb_cv_models <-
+  regionalCV(data = oac_monthly_quantity_hb_pre_cv19))
+plan(sequential)
+
+oac_hb_cv_models %>%
+  write_rds("../data/oac_hb_cv_models.rds")
 
 oac_hb_cv_models <- 
   read_rds("../data/oac_hb_cv_models.rds")
@@ -233,13 +235,13 @@ oac_hb_cv_models %>%
   theme(axis.text.x = element_text(angle = 90))
 ```
 
-* 724.044 seconds with multisession prophetModels()
+* 476.383 seconds 2020-12-13
 
 ```{r}
-# system.time(oac_hb_fcsts <- regionalJointFcsts(oac_monthly_quantity_hb_pre_cv19))
-# 
-# oac_hb_fcsts %>%
-#   write_rds("../data/oac_hb_fcsts.rds")
+system.time(oac_hb_fcsts <- regionalJointFcsts(oac_monthly_quantity_hb_pre_cv19))
+
+oac_hb_fcsts %>%
+  write_rds("../data/oac_hb_fcsts.rds")
 
 oac_hb_fcsts <- 
   read_rds("../data/oac_hb_fcsts.rds")
@@ -251,11 +253,13 @@ oac_hb_fcsts <-
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
-# system.time(oac_gp_cluster_cv_models <-
-#   regionalCV(data = oac_monthly_quantity_cluster_pre_cv19))
-# 
-# oac_gp_cluster_cv_models %>%
-#   write_rds("../data/oac_gp_cluster_cv_models.rds")
+plan(multisession)
+system.time(oac_gp_cluster_cv_models <-
+  regionalCV(data = oac_monthly_quantity_cluster_pre_cv19))
+plan(sequential)
+
+oac_gp_cluster_cv_models %>%
+  write_rds("../data/oac_gp_cluster_cv_models.rds")
 
 oac_gp_cluster_cv_models <- 
   read_rds("../data/oac_gp_cluster_cv_models.rds")
@@ -287,10 +291,10 @@ oac_gp_cluster_cv_models %>%
 * 5514.279 seconds
 
 ```{r}
-# system.time(oac_gp_cluster_fcsts <- regionalJointFcsts(oac_monthly_quantity_cluster_pre_cv19))
-# 
-# oac_gp_cluster_fcsts %>%
-#   write_rds("../data/oac_gp_cluster_fcsts.rds")
+system.time(oac_gp_cluster_fcsts <- regionalJointFcsts(oac_monthly_quantity_cluster_pre_cv19))
+
+oac_gp_cluster_fcsts %>%
+  write_rds("../data/oac_gp_cluster_fcsts.rds")
 
 oac_gp_cluster_fcsts <- 
   read_rds("../data/oac_gp_cluster_fcsts.rds")
@@ -310,13 +314,13 @@ incomplete_gp <- oac_monthly_quantity_gp_pre_cv19 %>%
     .$regional_unit %>% 
     unique()
 
-# system.time(oac_gp_cv_models <-
-#   oac_monthly_quantity_gp_pre_cv19 %>%
-#     filter(!regional_unit %in% incomplete_gp) %>%
-#               regionalCV())
-# 
-# oac_gp_cv_models %>%
-#   write_rds("../data/oac_gp_cv_models.rds")
+system.time(oac_gp_cv_models <-
+  oac_monthly_quantity_gp_pre_cv19 %>%
+    filter(!regional_unit %in% incomplete_gp) %>%
+              regionalCV())
+
+oac_gp_cv_models %>%
+  write_rds("../data/oac_gp_cv_models.rds")
 
 oac_gp_cv_models <- 
   read_rds("../data/oac_gp_cv_models.rds")
@@ -350,17 +354,21 @@ oac_gp_cv_models %>%
 
 
 ```{r}
-system.time(oac_gp_fcsts <-
-              oac_monthly_quantity_gp_pre_cv19 %>%
-              filter(!regional_unit %in% incomplete_gp) %>%
-              regionalJointFcsts())
-oac_gp_fcsts %>%
-  write_rds("../data/oac_gp_fcsts_1.rds")
+# plan(multisession)
+# system.time(oac_gp_fcsts <-
+#               oac_monthly_quantity_gp_pre_cv19 %>%
+#               filter(!regional_unit %in% incomplete_gp) %>%
+#               regionalJointFcsts())
+# plan(sequential)
+# oac_gp_fcsts %>%
+#   write_rds("../data/oac_gp_fcsts_1.rds")
 
-oac_gp_cluster_fcsts <- 
+oac_gp_fcsts <-
   read_rds("../data/oac_gp_fcsts_1.rds")
+
 ```
 
+* 2781.052 seconds
 
 ## Discrepancies
 
@@ -375,7 +383,7 @@ best_model_hb <-
 
 best_model_hb %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_hb_fcsts$forecasts,
+  inner_join(mutate(oac_hb_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_monthly_quantity_hb, 
@@ -402,7 +410,7 @@ best_model_gp_cluster <-
 
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oac_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_monthly_quantity_cluster, 
@@ -420,11 +428,11 @@ best_model_gp_cluster %>%
   theme(legend.position = "none")
 ```
 
-```{r}
+```{r, eval = FALSE}
 library(tidyLPA)
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oac_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_monthly_quantity_cluster, 

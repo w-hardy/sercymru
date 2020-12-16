@@ -9,6 +9,7 @@ output:
 
 ```{r setup}
 ## Packages
+# devtools::install_github("https://github.com/w-hardy/serCymruTools")
 library(tidyverse)
 library(lubridate)
 library(tsibble)
@@ -18,19 +19,20 @@ library(fable)
 library(fable.prophet)
 library(feasts)
 library(furrr)
+library(serCymruTools)
 
 ## Options
 knitr::opts_chunk$set(cache = TRUE)
 options(mc.cores = parallel::detectCores() - 1)
 rstan_options(auto_write = TRUE)
-options(future.rng.onMisue = "ignore")
 
 ## Seed
 set.seed(32)
 
-## Functions
-source("../r_scripts/functions.r")
+```
 
+
+```{r}
 ## Drugs of interest
 combined_hormonal <- 
   c("0703010E0", "0703010F0", "0703010G0", "0703010H0", "0703010M0",
@@ -453,9 +455,11 @@ oc_hb_cv_models %>%
 * 570.350 seconds with multisession prophetModels()
 
 ```{r}
+# plan(multisession)
 # system.time(oc_hb_fcsts <- regionalJointFcsts(oc_monthly_quantity_hb_pre_cv19))
+# plan(sequential)
 # 
-# oc_hb_fcsts %>% 
+# oc_hb_fcsts %>%
 #   write_rds("../data/oc_hb_fcsts.rds")
 
 oc_hb_fcsts <- 
@@ -504,7 +508,9 @@ oc_gp_cluster_cv_models %>%
 * 4300.706 seconds
 
 ```{r}
+# plan(multisession)
 # system.time(oc_gp_cluster_fcsts <- regionalJointFcsts(oc_monthly_quantity_cluster_pre_cv19))
+# plan(sequential)
 # 
 # oc_gp_cluster_fcsts %>%
 #   write_rds("../data/oc_gp_cluster_fcsts.rds")
@@ -569,14 +575,16 @@ oc_gp_cv_models %>%
 
 
 ```{r}
-# system.time(oc_gp_fcsts <- 
-#               oc_monthly_quantity_gp_pre_cv19 %>% 
-#               filter(!regional_unit %in% incomplete_gp) %>% 
+# plan(multisession)
+# system.time(oc_gp_fcsts <-
+#               oc_monthly_quantity_gp_pre_cv19 %>%
+#               filter(!regional_unit %in% incomplete_gp) %>%
 #               regionalJointFcsts())
-# oc_gp_fcsts %>% 
+# plan(sequential)
+# oc_gp_fcsts %>%
 #   write_rds("../data/oc_gp_fcsts.rds")
 
-oc_gp_cluster_fcsts <- 
+oc_gp_fcsts <- 
   read_rds("../data/oc_gp_fcsts.rds")
 ```
 
@@ -594,7 +602,7 @@ best_model_hb <-
 
 best_model_hb %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_hb_fcsts$forecasts,
+  inner_join(mutate(oc_hb_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oc_monthly_quantity_hb, 
@@ -622,7 +630,7 @@ best_model_gp_cluster <-
 
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oc_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oc_monthly_quantity_cluster, 
@@ -635,7 +643,7 @@ best_model_gp_cluster %>%
   # geom_boxplot(aes(x = as.factor(datename))) +
   geom_line(aes(x = datename, y = discrepancy, colour = as.factor(regional_unit)),
             alpha = .8, lty = 2) +
-  scale_color_gradientn(colours = rainbow(100))+
+  # scale_color_gradientn(colours = rainbow(100))+
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
 ```
@@ -644,7 +652,7 @@ best_model_gp_cluster %>%
 library(tidyLPA)
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oc_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oc_monthly_quantity_cluster, 
@@ -677,7 +685,7 @@ best_model_gp <-
 
 best_model_gp %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_fcsts$forecasts,
+  inner_join(mutate(oc_gp_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oc_monthly_quantity_gp, 
@@ -693,75 +701,4 @@ best_model_gp %>%
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
 ```
-
-
-## Plotting 
-
-```{r}
-best_model <- 
-  oc_gp_cluster_cv_models %>% 
-  group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
-  slice(1, .preserve = TRUE)
-
-best_model %>% 
-  select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_cluster_fcsts$forecasts,
-                    datename = yearmonth(datename)), 
-             by = c(".model", "regional_unit")) %>%
-  left_join(mutate(select(oc_monthly_quantity_cluster, 
-                          c(regional_unit, datename, n)), 
-                   datename = yearmonth(datename)),
-            by = c("datename", "regional_unit")) %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = .mean, colour = as.factor(regional_unit))) +
-  geom_ribbon(aes(ymin = lb_80, ymax = ub_80, fill = as.factor(regional_unit),
-              alpha = .05), outline.type = "both") +
-  geom_line(aes(y = n, group = regional_unit, colour = as.factor(regional_unit)), lty = 3) +
-  coord_cartesian(ylim = c(0,50))+
-  theme(legend.position = "none") +
-  facet_wrap(~.model) + 
-  labs(caption = "Dotted line = observed data, solid line and ribbon is predicted data with 80% CIs")
-
-```
-
-
-
-```{r}
-bestModelPlot <- function(models, forecasts, data, region){
-  best_model <- 
-    models %>% 
-    group_by(regional_unit) %>% 
-    arrange(RMSE, MAE) %>% 
-    slice(1, .preserve = TRUE)
-  
-  full_data <- filter(data, 
-                      datename > ymd("2020-02-28") &
-                        regional_unit == region) %>% 
-    mutate(datename = yearmonth(datename))
-  
-best_model %>% 
-    select(.model, regional_unit) %>% 
-    filter(regional_unit == region) %>% 
-    inner_join(forecasts, by = c(".model", "regional_unit")) %>%
-    left_join(full_data, by = c("datename", "regional_unit")) %>% 
-    ggplot(aes(x = datename, colour = as.factor(regional_unit))) +
-    geom_line(aes(y = .mean)) +
-    geom_ribbon(aes(ymin = lb_80, ymax = ub_80, fill = as.factor(regional_unit),
-                   alpha = .1)) +
-    geom_line(aes(y = n),
-              colour = "black") +
-    theme(legend.position = "none") +
-    facet_wrap(~.model)
-}
-
-bestModelPlot(models = oc_gp_cluster_cv_models, 
-              forecasts = oc_gp_cluster_fcsts$forecasts,
-              data = oc_monthly_quantity_cluster,
-              region = "CityHealth")
-
-
-
-```
-
 
