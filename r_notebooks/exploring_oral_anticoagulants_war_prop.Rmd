@@ -47,20 +47,9 @@ propRegional <- function(data, region, datename = datename, unit = Quantity,
     mutate(regional_unit = as_factor(set_names(!!region))) %>%
     group_by(!!datename, bnfchem, regional_unit) %>% 
     summarise(n = sum(!!unit)) %>% 
-    mutate(n = n / sum(n)) %>% 
-    filter(bnfchem == bnf) %>% 
-    mutate(n = case_when(str_detect(!!datename, pattern = "-01-") ~ n/31,
-                         str_detect(!!datename, pattern = "-02-") ~ n/28.25,
-                         str_detect(!!datename, pattern = "-03-") ~ n/31,
-                         str_detect(!!datename, pattern = "-04-") ~ n/30,
-                         str_detect(!!datename, pattern = "-05-") ~ n/31,
-                         str_detect(!!datename, pattern = "-06-") ~ n/30,
-                         str_detect(!!datename, pattern = "-07-") ~ n/31,
-                         str_detect(!!datename, pattern = "-08-") ~ n/31,
-                         str_detect(!!datename, pattern = "-09-") ~ n/30,
-                         str_detect(!!datename, pattern = "-10-") ~ n/31,
-                         str_detect(!!datename, pattern = "-11-") ~ n/30,
-                         str_detect(!!datename, pattern = "-12-") ~ n/31)) %>%
+    mutate(n = 100 * n / sum(n),
+           log_n = log(n)) %>% 
+    filter(bnfchem == bnf) %>%
     ungroup() %>%
     as_tsibble(index = !!datename, key = regional_unit)
 }
@@ -96,57 +85,34 @@ warf <- "0208020V0"
 gp <- read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL) %>% 
-  filter(year == 2020) # do something better
+  filter(year == 2020) # Do something better. Is npat important for the proportion?
+
 oac_p <- read_rds("../data/oral_anticoagulants.rds") 
 
 ## Sort into monthly count data
-oac_p_monthly_count <- oac_p %>% 
+oac_p_monthly_count <- 
+  oac_p %>% 
   group_by(datename, bnfchem) %>% 
   summarise(n = sum(Quantity)) %>% 
-  mutate(n = n / sum(n)) %>% 
+  mutate(n = 100 * n / sum(n), # make it a percentage rather than proportion
+         log_n = log(n)) %>% 
   filter(bnfchem == warf) %>% 
-  mutate(datename = yearmonth(datename),
-         n = case_when(str_detect(datename, pattern = "Jan") ~ n/31,
-                       str_detect(datename, pattern = "Feb") ~ n/28.25,
-                       str_detect(datename, pattern = "Mar") ~ n/31,
-                       str_detect(datename, pattern = "Apr") ~ n/30,
-                       str_detect(datename, pattern = "May") ~ n/31,
-                       str_detect(datename, pattern = "Jun") ~ n/30,
-                       str_detect(datename, pattern = "Jul") ~ n/31,
-                       str_detect(datename, pattern = "Aug") ~ n/31,
-                       str_detect(datename, pattern = "Sep") ~ n/30,
-                       str_detect(datename, pattern = "Oct") ~ n/31,
-                       str_detect(datename, pattern = "Nov") ~ n/30,
-                       str_detect(datename, pattern = "Dec") ~ n/31)) %>% 
   ungroup() %>%
-    as_tsibble(index = datename)
+  as_tsibble(index = datename)
 
 oac_p_monthly_quantity_hb <- 
   right_join(oac_p, select(gp, c(practiceid, hboard)), 
              by = c("PracticeID" = "practiceid")) %>%
   propRegional(region = hboard, datename = datename, unit = Quantity,
-               bnf = warf) %>% 
-  left_join(gp %>% 
-  select(c(practiceid, npat, hboard)) %>% 
-  group_by(hboard) %>% 
-  summarise(npat = sum(npat)), by = c("regional_unit" = "hboard")) %>% 
-  mutate(n = 1000*n/npat) # quantity per 1000 pts
+               bnf = warf) 
 
 oac_p_monthly_quantity_cluster <- 
   right_join(oac_p, select(gp, c(practiceid, cluster)), 
              by = c("PracticeID" = "practiceid")) %>%
-  propRegional(cluster, datename, Quantity, bnf = warf) %>% 
-  left_join(gp %>% 
-  select(c(practiceid, npat, cluster)) %>% 
-  group_by(cluster) %>% 
-  summarise(npat = sum(npat)), by = c("regional_unit" = "cluster")) %>% 
-  mutate(n = 1000*n/npat) # quantity per 1000 pts
+  propRegional(cluster, datename, Quantity, bnf = warf)
 
 oac_p_monthly_quantity_gp <- 
-  propRegional(oac_p, PracticeID, datename, Quantity, bnf = warf) %>% 
-  right_join(select(gp, c(practiceid, npat)), 
-            by = c("regional_unit" = "practiceid")) %>% 
-  mutate(n = 1000*n/npat)
+  propRegional(oac_p, PracticeID, datename, Quantity, bnf = warf)
   
 
 ## Sort into monthly count data pre-lockdown (2020-03-23)
@@ -180,6 +146,13 @@ oac_p %>%
   summarise(n = sum(Quantity)) %>% 
   tsibble() %>% 
   autoplot(n) +
+  geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
+```
+
+```{r oac-p-monthly-ts-plot, fig.cap="Total quantity of combined oral anticoagulants prescribed per month."}
+oac_p_monthly_count %>% 
+  select(datename, n) %>% 
+  autoplot() +
   geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
 ```
 
@@ -242,11 +215,11 @@ oac_p_monthly_count_pre_cv19$n %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-system.time(oac_p_hb_cv_models <-
-  regionalCV(data = oac_p_monthly_quantity_hb_pre_cv19))
-
-oac_p_hb_cv_models %>%
-  write_rds("../data/oac_p_hb_cv_models.rds")
+# system.time(oac_p_hb_cv_models <-
+#   regionalCV(data = oac_p_monthly_quantity_hb_pre_cv19))
+# 
+# oac_p_hb_cv_models %>%
+#   write_rds("../data/oac_p_hb_cv_models.rds")
 
 oac_p_hb_cv_models <- 
   read_rds("../data/oac_p_hb_cv_models.rds")
@@ -276,10 +249,10 @@ oac_p_hb_cv_models %>%
 * 724.044 seconds with multisession prophetModels()
 
 ```{r}
-system.time(oac_p_hb_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_hb_pre_cv19))
-
-oac_p_hb_fcsts %>%
-  write_rds("../data/oac_p_hb_fcsts.rds")
+# system.time(oac_p_hb_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_hb_pre_cv19))
+# 
+# oac_p_hb_fcsts %>%
+#   write_rds("../data/oac_p_hb_fcsts.rds")
 
 oac_p_hb_fcsts <- 
   read_rds("../data/oac_p_hb_fcsts.rds")
@@ -291,11 +264,11 @@ oac_p_hb_fcsts <-
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
-system.time(oac_p_gp_cluster_cv_models <-
-  regionalCV(data = oac_p_monthly_quantity_cluster_pre_cv19))
-
-oac_p_gp_cluster_cv_models %>%
-  write_rds("../data/oac_p_gp_cluster_cv_models.rds")
+# system.time(oac_p_gp_cluster_cv_models <-
+#   regionalCV(data = oac_p_monthly_quantity_cluster_pre_cv19))
+# 
+# oac_p_gp_cluster_cv_models %>%
+#   write_rds("../data/oac_p_gp_cluster_cv_models.rds")
 
 oac_p_gp_cluster_cv_models <- 
   read_rds("../data/oac_p_gp_cluster_cv_models.rds")
@@ -327,10 +300,12 @@ oac_p_gp_cluster_cv_models %>%
 * 5514.279 seconds
 
 ```{r}
-system.time(oac_p_gp_cluster_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_cluster_pre_cv19))
-
-oac_p_gp_cluster_fcsts %>%
-  write_rds("../data/oac_p_gp_cluster_fcsts.rds")
+# plan(multisession)
+# system.time(oac_p_gp_cluster_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_cluster_pre_cv19))
+# plan(sequential)
+# 
+# oac_p_gp_cluster_fcsts %>%
+#   write_rds("../data/oac_p_gp_cluster_fcsts.rds")
 
 oac_p_gp_cluster_fcsts <- 
   read_rds("../data/oac_p_gp_cluster_fcsts.rds")
@@ -350,13 +325,13 @@ incomplete_gp <- oac_p_monthly_quantity_gp_pre_cv19 %>%
     .$regional_unit %>% 
     unique()
 
-system.time(oac_p_gp_cv_models <-
-  oac_p_monthly_quantity_gp_pre_cv19 %>%
-    filter(!regional_unit %in% incomplete_gp) %>%
-              regionalCV())
-
-oac_p_gp_cv_models %>%
-  write_rds("../data/oac_p_gp_cv_models.rds")
+# system.time(oac_p_gp_cv_models <-
+#   oac_p_monthly_quantity_gp_pre_cv19 %>%
+#     filter(!regional_unit %in% incomplete_gp) %>%
+#               regionalCV())
+# 
+# oac_p_gp_cv_models %>%
+#   write_rds("../data/oac_p_gp_cv_models.rds")
 
 oac_p_gp_cv_models <- 
   read_rds("../data/oac_p_gp_cv_models.rds")
@@ -390,58 +365,59 @@ oac_p_gp_cv_models %>%
 
 
 ```{r}
-regionalJointFcsts <- function (data, h = "5 months", keep_fits = FALSE) 
-{
-  if (!is.logical(keep_fits)) {
-    stop("`keep_fits` must be of type logical")
-  }
-  regions <- unique(data$regional_unit)
-  
-  cl <- parallel::makeCluster(8)
-  plan(cluster, workers = cl)
-  
-  fable_fcst <- 
-    future_map_dfr(.x = regions, 
-                   .f = ~fableModels(filter(data, 
-                                            regional_unit == .x)) %>% 
-                     forecast(h = h) %>% as_tibble(), 
-                   .options = furrr_options(seed = TRUE))
-  
-  
-  message("fable fits complete, step 1/4")
-  message("fable forecasts complete, step 2/4")
+# regionalJointFcsts <- function (data, h = "5 months", keep_fits = FALSE) 
+# {
+#   if (!is.logical(keep_fits)) {
+#     stop("`keep_fits` must be of type logical")
+#   }
+#   regions <- unique(data$regional_unit)
+#   
+#   cl <- parallel::makeCluster(8)
+#   plan(cluster, workers = cl)
+#   
+#   fable_fcst <- 
+#     future_map_dfr(.x = regions, 
+#                    .f = ~fableModels(filter(data, 
+#                                             regional_unit == .x)) %>% 
+#                      forecast(h = h) %>% as_tibble(), 
+#                    .options = furrr_options(seed = TRUE))
+#   
+#   
+#   message("fable fits complete, step 1/4")
+#   message("fable forecasts complete, step 2/4")
+# 
+#   prophet_fcst <- 
+#     future_map_dfr(.x = regions, 
+#                    .f = ~prophetModels(filter(data, 
+#                                             regional_unit == .x)) %>% 
+#                      forecast(h = h) %>% as_tibble(), 
+#                    .options = furrr_options(seed = TRUE))
+#   message("prophet fits complete, step 3/4")
+#   message("prophet forecasts complete, step 4/4")
+#   
+#   parallel::stopCluster(cl)
+#   plan(sequential)
+#   joint_fcst <- dplyr::bind_rows(fable_fcst, prophet_fcst) %>% 
+#     dplyr::mutate(lb_95 = quantile(n, 0.025), lb_80 = quantile(n, 
+#       0.1), med = median(n), ub_80 = quantile(n, 0.9), 
+#       ub_95 = quantile(n, 0.975), sd = distributional::variance(n)^2, 
+#       dist = n, n = NULL)
+#       return(list(forecasts = joint_fcst))
+# }
 
-  prophet_fcst <- 
-    future_map_dfr(.x = regions, 
-                   .f = ~prophetModels(filter(data, 
-                                            regional_unit == .x)) %>% 
-                     forecast(h = h) %>% as_tibble(), 
-                   .options = furrr_options(seed = TRUE))
-  message("prophet fits complete, step 3/4")
-  message("prophet forecasts complete, step 4/4")
-  
-  parallel::stopCluster(cl)
-  plan(sequential)
-  joint_fcst <- dplyr::bind_rows(fable_fcst, prophet_fcst) %>% 
-    dplyr::mutate(lb_95 = quantile(n, 0.025), lb_80 = quantile(n, 
-      0.1), med = median(n), ub_80 = quantile(n, 0.9), 
-      ub_95 = quantile(n, 0.975), sd = distributional::variance(n)^2, 
-      dist = n, n = NULL)
-      return(list(forecasts = joint_fcst))
-}
+# system.time(oac_p_gp_fcsts <-
+#               oac_p_monthly_quantity_gp_pre_cv19 %>%
+#               filter(!regional_unit %in% incomplete_gp) %>%
+#               regionalJointFcsts())
+# 
+# oac_p_gp_fcsts %>%
+#   write_rds("../data/oac_p_gp_fcsts.rds")
 
-system.time(oac_p_gp_fcsts <-
-              oac_p_monthly_quantity_gp_pre_cv19 %>%
-              filter(!regional_unit %in% incomplete_gp) %>%
-              regionalJointFcsts(keep_fits = TRUE))
-
-oac_p_gp_fcsts %>%
-  write_rds("../data/oac_p_gp_fcsts_2.rds")
-
-oac_p_gp_cluster_fcsts <- 
-  read_rds("../data/oac_p_gp_fcsts_2.rds")
+oac_p_gp_fcsts <- 
+  read_rds("../data/oac_p_gp_fcsts.rds")
 ```
 
+* 2020-12-18 2694 secs
 
 ## Discrepancies
 
@@ -456,7 +432,7 @@ best_model_hb <-
 
 best_model_hb %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_p_hb_fcsts$forecasts,
+  inner_join(mutate(oac_p_hb_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_p_monthly_quantity_hb, 
@@ -483,7 +459,7 @@ best_model_gp_cluster <-
 
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_p_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oac_p_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_p_monthly_quantity_cluster, 
@@ -501,31 +477,29 @@ best_model_gp_cluster %>%
   theme(legend.position = "none")
 ```
 
+```{r, eval = FALSE}
+# lcmm::
+
+```
+
+
 ```{r}
-library(tidyLPA)
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_p_gp_cluster_fcsts$forecasts,
+  inner_join(mutate(oac_p_gp_cluster_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_p_monthly_quantity_cluster, 
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = n - .mean,
-         z_discrepancy = discrepancy/sd)  %>%
-    select(discrepancy, regional_unit, datename) %>%
+  mutate(discrepancy = (n - .mean), # Why are the numbers so small?
+         regional_unit = as.factor(regional_unit)) %>% 
+  select(regional_unit, datename, discrepancy) %>% 
   pivot_wider(names_from = datename, values_from = discrepancy) %>% 
-  ungroup() %>% 
-  select(-regional_unit) %>% 
-  # estimate_profiles(n_profiles = 4, models = 1) %>% plot_profiles()
-    estimate_profiles(1:5,
-                      variances = c("equal", "varying"),
-                      covariances = c("zero", "varying")
-                      ) %>% 
-    compare_solutions(statistics = c("AIC", "BIC"))
+  mutate(regional_unit = as.numeric(regional_unit)) %>% 
+  write_csv(file = "../data/mplus/oac_cluster_discrep.csv", col_names = FALSE)
 ```
-
 
 ### By GP Practice
 
@@ -538,7 +512,7 @@ best_model_gp <-
 
 best_model_gp %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(oac_p_gp_fcsts$forecasts,
+  inner_join(mutate(oac_p_gp_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
   left_join(mutate(select(oac_p_monthly_quantity_gp, 
@@ -553,4 +527,34 @@ best_model_gp %>%
             alpha = .8, lty = 2) +
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
+
+
 ```
+
+
+
+```{r}
+best_model_gp %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oac_p_gp_fcsts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oac_p_monthly_quantity_gp, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = 1000000*(n - .mean), # Why are the numbers so small?
+         regional_unit = as.factor(regional_unit)) %>% 
+  select(regional_unit, datename, discrepancy) %>% 
+  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
+  mutate(regional_unit = as.numeric(regional_unit)) %>% 
+  na.omit() %>% .[2:5] %>% min()
+  write_csv(file = "../data/mplus/oac_gp_discrep.csv", col_names = FALSE)
+```
+
+```{r}
+source("../r_scripts/functions/mplus_plotting.R")
+mplus.view.plots("../mplus_analyses/oac_discrep_3_class_bayes.gh5")
+mplus.plot.estimated_means("../mplus_analyses/oac_discrep_3_class_bayes.gh5")
+```
+
