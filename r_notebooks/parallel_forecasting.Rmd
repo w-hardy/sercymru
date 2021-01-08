@@ -18,6 +18,7 @@ library(fable.prophet)
 library(feasts)
 library(furrr)
 library(knitr)
+library(serCymruTools)
 
 # Options ####
 knitr::opts_chunk$set(cache = TRUE)
@@ -28,9 +29,6 @@ options(future.rng.onMisue = "ignore")
 # Seed ####
 set.seed(32)
 
-# Functions ####
-
-source("../r_scripts/functions.r")
 
 # Data ####
 
@@ -732,7 +730,7 @@ best_models_1 %>%
 ### prophet::cross_validation()
 
 ```{r}
-cross_validation(select(oc_gp_cluster_fcts$fits, c(regional_unit, starts_with("oc_proph"))), horizon = .5, units = "years", initial = 3)
+cross_validation(select(oc_gp_cluster_fcts$fits, c(regional_unit, starts_with("oc_proph"))), horizon = , units = "years", initial = 3)
 ```
 
 
@@ -856,3 +854,71 @@ oc_monthly_quantity_gp %>%
             col = "blue", lty = 3) +
   geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
 ```
+
+
+## parallel joint forecasts
+
+Why does only one part of this run in parallel?
+
+```{r}
+regionalJointFcsts <- function(data, h ="5 months"){
+  regions <- unique(data$regional_unit)
+  plan(multisession, gc = TRUE)
+  fable_fit <-
+    future_map_dfr(.x = regions,
+                   .f = ~fableModels(filter(data, regional_unit ==.x)),
+                   .options = furrr_options(seed = TRUE))
+  message("fable fits complete")
+
+  fable_fcst <- 
+    future_map_dfr(.x = regions,
+                   .f = ~as_tibble(forecast(filter(fable_fit, 
+                                                   regional_unit ==.x),
+                                  h = h)),
+                   .options = furrr_options(seed = TRUE))
+    # fable_fit %>%
+    # forecast(h = h) %>%
+    # as_tibble()
+  message("fable forecasts complete")
+
+  prophet_fit <-
+    future_map_dfr(.x = regions,
+                   .f = ~prophetModels(filter(data, regional_unit ==.x)),
+                   .options = furrr_options(seed = TRUE))
+  message("prophet fits complete")
+
+  prophet_fcst <-
+        future_map_dfr(.x = regions,
+                   .f = ~as_tibble(forecast(filter(prophet_fit, 
+                                                   regional_unit ==.x),
+                                  h = h)),
+                   .options = furrr_options(seed = TRUE))
+    # forecast(prophet_fit, h = h) %>%
+    # as_tibble()
+  # Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
+  # This may also be influencing accuracy
+
+  message("prophet forecasts complete")
+  plan(sequential)
+  # prophetModels now being run in parallel. Needed to reinstall prophet from
+  # source
+
+  joint_fcst <-
+    bind_rows(fable_fcst, prophet_fcst) %>%
+    mutate(lb_95 = quantile(n, .025),
+           lb_80 = quantile(n, .1),
+           med = median(n),
+           ub_80 = quantile(n, .9),
+           ub_95 = quantile(n, .975),
+           sd = distributional::variance(n)^2,
+           dist = n,
+           n = NULL)
+
+  return(joint_fcst)
+}
+
+system.time(regionalJointFcsts(data = dev_data))
+```
+
+
+84.619 seconds when opening and closing plan(multisession) over 5 regional units vs 59.108 when leaving them open
