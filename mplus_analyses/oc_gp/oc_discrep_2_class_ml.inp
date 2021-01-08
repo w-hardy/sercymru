@@ -12,26 +12,24 @@ cluster regional_unit mar apr may jun jul
 IDvariable is regional_unit;
 
 USEVARIABLE ARE
-mar-jul
+cluster mar-jul
 ;
-cluster = cluster;
+!CLUSTER = cluster;
 CLASSES =  c (2);
 
 MISSING ARE ALL (-999);
 
 ANALYSIS:
-TYPE = mixture random;
+TYPE = mixture;
 STARTS = 500 20;
 STITERATIONS = 20;
 
 MODEL: 
-%within%
+!%within%
 %overall%
-
 i s q| mar@0 apr@1  may@2 jun@3 jul@4;
-i-q@0;
-
-  
+!i-q@0;
+ 
 OUTPUT:
 TECH1 SAMPSTAT tech8;
 

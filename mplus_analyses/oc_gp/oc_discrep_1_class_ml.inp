@@ -20,13 +20,13 @@ CLASSES =  c (1);
 MISSING ARE ALL (-999);
 
 ANALYSIS:
-TYPE = mixture random;
+TYPE = mixture twolevel;
 STARTS = 500 20;
 STITERATIONS = 20;
 
 MODEL: 
 %within%
-%overall$
+%overall%
 
 i s q| mar@0 apr@1  may@2 jun@3 jul@4;
 i-q@0;
