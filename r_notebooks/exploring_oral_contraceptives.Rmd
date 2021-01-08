@@ -648,7 +648,7 @@ best_model_gp_cluster %>%
   theme(legend.position = "none")
 ```
 
-```{r}
+```{r, eval = FALSE}
 library(tidyLPA)
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
@@ -702,3 +702,37 @@ best_model_gp %>%
   theme(legend.position = "none")
 ```
 
+
+
+```{r}
+best_model_gp %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oc_gp_fcsts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oc_monthly_quantity_gp, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = (n - .mean), # Why are the numbers so small?
+         regional_unit = as.factor(regional_unit)) %>% 
+  select(regional_unit, datename, discrepancy) %>% 
+  filter(!is.na(discrepancy)) %>% # need to remove NA before pivoting to enalable values_fill
+  pivot_wider(names_from = datename, values_from = discrepancy, values_fill = -999) %>% 
+  left_join(select(gp, c(practiceid, cluster)), by = c("regional_unit" = "practiceid")) %>% 
+  mutate(regional_unit = as.factor(regional_unit),
+         cluster = as.factor(cluster)) %>% 
+  mutate(regional_unit = as.numeric(regional_unit),
+         cluster = as.numeric(cluster)) %>% 
+  select(cluster, regional_unit, everything()) %>% 
+  write_csv(file = "../data/mplus/oc_gp_discrep.csv", col_names = FALSE)
+
+
+```
+
+
+```{r}
+source("../r_scripts/functions/mplus_plotting.R")
+mplus.view.plots("../mplus_analyses/oc_gp/oac_discrep_3_class_bayes.gh5")
+mplus.plot.estimated_means("../mplus_analyses/oc_gp/oac_discrep_3_class_bayes.gh5")
+```
