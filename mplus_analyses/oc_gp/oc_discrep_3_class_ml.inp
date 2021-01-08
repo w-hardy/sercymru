@@ -1,0 +1,40 @@
+TITLE: oc discrepancy 3 class ml;
+
+DATA: 
+FILE IS ../../data/mplus/oc_gp_discrep.csv;
+
+
+VARIABLE: 
+NAMES ARE 
+cluster regional_unit mar apr may jun jul
+;
+
+IDvariable is regional_unit;
+
+USEVARIABLE ARE
+mar-jul
+;
+cluster = cluster;
+CLASSES =  c (3);
+
+MISSING ARE ALL (-999);
+
+ANALYSIS:
+TYPE = mixture twolevel;
+STARTS = 500 20;
+STITERATIONS = 20;
+
+MODEL: 
+%within%
+%overall%
+
+i s q| mar@0 apr@1  may@2 jun@3 jul@4;
+i-q@0;
+  
+OUTPUT:
+TECH1 SAMPSTAT tech8 TECH11 TECH14;
+
+PLOT:
+TYPE = PLOT1 PLOT2 PlOT3;
+SERIES = mar-jul (s);
+

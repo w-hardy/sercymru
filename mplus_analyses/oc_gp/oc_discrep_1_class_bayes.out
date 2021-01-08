@@ -1,0 +1,1016 @@
+Mplus VERSION 8.5 DEMO
+MUTHEN & MUTHEN
+01/08/2021  10:32 AM
+
+INPUT INSTRUCTIONS
+
+  TITLE: oc discrepancy 1 class bayes;
+
+  DATA:
+  FILE IS ../../data/mplus/oc_gp_discrep.csv;
+
+
+  VARIABLE:
+  NAMES ARE
+  cluster regional_unit mar apr may jun jul
+  ;
+
+  IDvariable is regional_unit;
+
+  USEVARIABLE ARE
+  mar-jul
+  ;
+  cluster = cluster;
+
+  CLASSES =  c (1);
+
+  MISSING ARE ALL (-999);
+
+  ANALYSIS:
+  estimator = bayes;
+  biterations = 100000000 (300000);
+  chains = 1;
+  bconvergence = .01;
+  TYPE = mixture twolevel;
+  bseed is 111;
+
+  MODEL:
+  %within%
+  %overall%
+
+
+  i s q | mar@0 apr@1  may@2 jun@3 jul@4;
+  i-q@0;
+
+
+  OUTPUT:
+  TECH1 SAMPSTAT tech8;
+
+  PLOT:
+  TYPE = PLOT1 PLOT2 PlOT3;
+  SERIES =
+  mar-jul (s);
+
+
+
+
+*** WARNING in ANALYSIS command
+  Estimator BAYES is not allowed with TYPE=TWOLEVEL MIXTURE.
+  Default estimator will be used.
+*** WARNING in ANALYSIS command
+  The BITERATIONS option is not available with this analysis.
+  BITERATIONS will be ignored.
+  Specify ESTIMATOR=BAYES to use this option.
+*** WARNING in ANALYSIS command
+  The BCONVERGENCE option is not available with this analysis.
+  BCONVERGENCE will be ignored.
+  Specify ESTIMATOR=BAYES to use this option.
+*** WARNING in ANALYSIS command
+  The BSEED option is not available with this analysis.
+  BSEED will be ignored.
+  Specify ESTIMATOR=BAYES to use this option.
+*** WARNING in ANALYSIS command
+  The CHAINS option is not available with this analysis.
+  CHAINS will be ignored.
+  Specify ESTIMATOR=BAYES to use this option.
+*** WARNING in MODEL command
+  All continuous latent variable covariances involving I on the within level
+  have been fixed to 0 because the variance of I is fixed at 0.
+*** WARNING in MODEL command
+  All continuous latent variable covariances involving S on the within level
+  have been fixed to 0 because the variance of S is fixed at 0.
+   7 WARNING(S) FOUND IN THE INPUT INSTRUCTIONS
+
+
+
+oc discrepancy 1 class bayes;
+
+SUMMARY OF ANALYSIS
+
+Number of groups                                                 1
+Number of observations                                         405
+
+Number of dependent variables                                    5
+Number of independent variables                                  0
+Number of continuous latent variables                            3
+Number of categorical latent variables                           1
+
+Observed dependent variables
+
+  Continuous
+   MAR         APR         MAY         JUN         JUL
+
+Continuous latent variables
+   I           S           Q
+
+Categorical latent variables
+   C
+
+Variables with special functions
+
+  Cluster variable      CLUSTER
+  ID variable           REGIONAL
+
+Estimator                                                      MLR
+Information matrix                                        OBSERVED
+Optimization Specifications for the Quasi-Newton Algorithm for
+Continuous Outcomes
+  Maximum number of iterations                                 100
+  Convergence criterion                                  0.100D-05
+Optimization Specifications for the EM Algorithm
+  Maximum number of iterations                                 500
+  Convergence criteria
+    Loglikelihood change                                 0.100D-02
+    Relative loglikelihood change                        0.100D-05
+    Derivative                                           0.100D-02
+Optimization Specifications for the M step of the EM Algorithm for
+Categorical Latent variables
+  Number of M step iterations                                    1
+  M step convergence criterion                           0.100D-02
+  Basis for M step termination                           ITERATION
+Optimization Specifications for the M step of the EM Algorithm for
+Censored, Binary or Ordered Categorical (Ordinal), Unordered
+Categorical (Nominal) and Count Outcomes
+  Number of M step iterations                                    1
+  M step convergence criterion                           0.100D-02
+  Basis for M step termination                           ITERATION
+  Maximum value for logit thresholds                            15
+  Minimum value for logit thresholds                           -15
+  Minimum expected cell size for chi-square              0.100D-01
+Maximum number of iterations for H1                           2000
+Convergence criterion for H1                             0.100D-03
+Optimization algorithm                                         EMA
+Integration Specifications
+  Type                                                    STANDARD
+  Number of integration points                                  15
+  Dimensions of numerical integration                            0
+  Adaptive quadrature                                           ON
+Cholesky                                                       OFF
+
+Input data file(s)
+  ../../data/mplus/oc_gp_discrep.csv
+Input data format  FREE
+
+
+SUMMARY OF DATA
+
+     Number of missing data patterns             3
+     Number of y missing data patterns           3
+     Number of u missing data patterns           0
+     Number of clusters                          1
+
+
+
+COVARIANCE COVERAGE OF DATA
+
+Minimum covariance coverage value   0.100
+
+
+     PROPORTION OF DATA PRESENT FOR Y
+
+
+           Covariance Coverage
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR            0.998
+ APR            0.998         0.998
+ MAY            0.995         0.995         0.998
+ JUN            0.998         0.998         0.995         0.998
+ JUL            0.995         0.995         0.995         0.995         0.995
+
+
+SAMPLE STATISTICS
+
+
+     ESTIMATED SAMPLE STATISTICS
+
+
+           Means
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+                3.636        -4.368        -6.671        -3.322        -1.243
+
+
+           Covariances
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR           63.562
+ APR           21.256        90.007
+ MAY           18.529        46.577        72.731
+ JUN           18.386        42.838        43.290        71.455
+ JUL            8.430        19.336        22.122        22.487        52.442
+
+
+           Correlations
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR            1.000
+ APR            0.281         1.000
+ MAY            0.273         0.576         1.000
+ JUN            0.273         0.534         0.600         1.000
+ JUL            0.146         0.281         0.358         0.367         1.000
+
+
+     MAXIMUM LOG-LIKELIHOOD VALUE FOR THE UNRESTRICTED (H1) MODEL IS -6890.340
+
+
+UNIVARIATE SAMPLE STATISTICS
+
+
+     UNIVARIATE HIGHER-ORDER MOMENT DESCRIPTIVE STATISTICS
+
+         Variable/         Mean/     Skewness/   Minimum/ % with                Percentiles
+        Sample Size      Variance    Kurtosis    Maximum  Min/Max      20%/60%    40%/80%    Median
+
+     MAR                   3.641       0.337     -29.334    0.25%      -2.468      1.493      3.204
+             404.000      63.560       3.241      48.944    0.25%       4.965      9.353
+     APR                  -4.354      -1.073     -65.976    0.25%      -9.703     -5.729     -4.087
+             404.000      89.995       7.067      28.112    0.25%      -2.751      2.105
+     MAY                  -6.618      -1.578     -61.755    0.25%     -11.983     -7.743     -5.659
+             404.000      71.649       9.396      25.882    0.25%      -4.357     -1.067
+     JUN                  -3.309      -2.117     -69.540    0.25%      -8.251     -4.325     -2.349
+             404.000      71.445      13.267      22.047    0.25%      -1.102      2.154
+     JUL                  -1.211       0.015     -26.049    0.25%      -6.677     -2.440     -0.884
+             403.000      52.198       1.217      27.023    0.25%       0.417      4.048
+
+     THE STANDARD ERRORS OF THE MODEL PARAMETER ESTIMATES MAY NOT BE
+     TRUSTWORTHY FOR SOME PARAMETERS DUE TO A NON-POSITIVE DEFINITE
+     FIRST-ORDER DERIVATIVE PRODUCT MATRIX.  THIS MAY BE DUE TO THE STARTING
+     VALUES BUT MAY ALSO BE AN INDICATION OF MODEL NONIDENTIFICATION.  THE
+     CONDITION NUMBER IS      -0.155D-15.  PROBLEM INVOLVING THE FOLLOWING PARAMETER:
+     Parameter 2, %WITHIN% %C#1%: APR
+
+     THE NONIDENTIFICATION IS MOST LIKELY DUE TO HAVING MORE PARAMETERS THAN THE
+     NUMBER OF CLUSTERS. REDUCE THE NUMBER OF PARAMETERS.
+
+
+THE MODEL ESTIMATION TERMINATED NORMALLY
+
+
+
+MODEL FIT INFORMATION
+
+Number of Free Parameters                       10
+
+Loglikelihood
+
+          H0 Value                       -7134.649
+          H0 Scaling Correction Factor      0.0000
+            for MLR
+
+Information Criteria
+
+          Akaike (AIC)                   14289.299
+          Bayesian (BIC)                 14329.338
+          Sample-Size Adjusted BIC       14297.606
+            (n* = (n + 2) / 24)
+
+
+
+FINAL CLASS COUNTS AND PROPORTIONS FOR THE LATENT CLASSES
+BASED ON ESTIMATED POSTERIOR PROBABILITIES
+
+    Latent
+   Classes
+
+       1        405.00000          1.00000
+
+
+FINAL CLASS COUNTS AND PROPORTIONS FOR THE LATENT CLASSES
+BASED ON THEIR MOST LIKELY LATENT CLASS MEMBERSHIP
+
+Class Counts and Proportions
+
+    Latent
+   Classes
+
+       1              405          1.00000
+
+
+Average Latent Class Probabilities for Most Likely Latent Class Membership (Row)
+by Latent Class (Column)
+
+           1
+
+    1   1.000
+
+
+Classification Probabilities for the Most Likely Latent Class Membership (Column)
+by Latent Class (Row)
+
+           1
+
+    1   1.000
+
+
+Logits for the Classification Probabilities for the Most Likely Latent Class Membership (Column)
+by Latent Class (Row)
+
+              1
+
+    1      0.000
+
+
+MODEL RESULTS
+
+                                                    Two-Tailed
+                    Estimate       S.E.  Est./S.E.    P-Value
+
+Within Level
+
+Latent Class 1
+
+ I        |
+    MAR                1.000      0.000    999.000    999.000
+    APR                1.000      0.000    999.000    999.000
+    MAY                1.000      0.000    999.000    999.000
+    JUN                1.000      0.000    999.000    999.000
+    JUL                1.000      0.000    999.000    999.000
+
+ S        |
+    MAR                0.000      0.000    999.000    999.000
+    APR                1.000      0.000    999.000    999.000
+    MAY                2.000      0.000    999.000    999.000
+    JUN                3.000      0.000    999.000    999.000
+    JUL                4.000      0.000    999.000    999.000
+
+ Q        |
+    MAR                0.000      0.000    999.000    999.000
+    APR                1.000      0.000    999.000    999.000
+    MAY                4.000      0.000    999.000    999.000
+    JUN                9.000      0.000    999.000    999.000
+    JUL               16.000      0.000    999.000    999.000
+
+ Variances
+    I                  0.000      0.000    999.000    999.000
+    S                  0.000      0.000    999.000    999.000
+    Q                  0.000      0.000    999.000    999.000
+
+ Residual Variances
+    MAR               63.560      0.000  *********      0.000
+    APR               89.987      0.007  12075.219      0.000
+    MAY               71.649      0.000  *********      0.000
+    JUN               71.445      0.000  *********      0.000
+    JUL               52.194      0.004  12955.419      0.000
+
+Between Level
+
+Latent Class 1
+
+ Means
+    MAR                3.641      0.000  *********      0.000
+    APR               -4.354      0.000  *********      0.000
+    MAY               -6.618      0.000  *********      0.000
+    JUN               -3.309      0.000  *********      0.000
+    JUL               -1.211      0.000  *********      0.000
+
+
+QUALITY OF NUMERICAL RESULTS
+
+     Condition Number for the Information Matrix             -0.155E-15
+       (ratio of smallest to largest eigenvalue)
+
+
+TECHNICAL 1 OUTPUT
+
+
+     PARAMETER SPECIFICATION FOR WITHIN LEVEL, LATENT CLASS 1
+
+
+           NU
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+                    0             0             0             0             0
+
+
+           LAMBDA
+              I             S             Q
+              ________      ________      ________
+ MAR                0             0             0
+ APR                0             0             0
+ MAY                0             0             0
+ JUN                0             0             0
+ JUL                0             0             0
+
+
+           THETA
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR                1
+ APR                0             2
+ MAY                0             0             3
+ JUN                0             0             0             4
+ JUL                0             0             0             0             5
+
+
+           ALPHA
+              I             S             Q
+              ________      ________      ________
+                    0             0             0
+
+
+           BETA
+              I             S             Q
+              ________      ________      ________
+ I                  0             0             0
+ S                  0             0             0
+ Q                  0             0             0
+
+
+           PSI
+              I             S             Q
+              ________      ________      ________
+ I                  0
+ S                  0             0
+ Q                  0             0             0
+
+
+     PARAMETER SPECIFICATION FOR BETWEEN LEVEL, LATENT CLASS 1
+
+
+           NU
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+                    6             7             8             9            10
+
+
+           LAMBDA
+              I             S             Q
+              ________      ________      ________
+ MAR                0             0             0
+ APR                0             0             0
+ MAY                0             0             0
+ JUN                0             0             0
+ JUL                0             0             0
+
+
+           THETA
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR                0
+ APR                0             0
+ MAY                0             0             0
+ JUN                0             0             0             0
+ JUL                0             0             0             0             0
+
+
+           ALPHA
+              I             S             Q
+              ________      ________      ________
+                    0             0             0
+
+
+           BETA
+              I             S             Q
+              ________      ________      ________
+ I                  0             0             0
+ S                  0             0             0
+ Q                  0             0             0
+
+
+           PSI
+              I             S             Q
+              ________      ________      ________
+ I                  0
+ S                  0             0
+ Q                  0             0             0
+
+
+     PARAMETER SPECIFICATION FOR LATENT CLASS REGRESSION MODEL PART
+
+
+           ALPHA(C)
+              C#1
+              ________
+                    0
+
+
+           GAMMA(C)
+              I             S             Q
+              ________      ________      ________
+ C#1                0             0             0
+
+
+     STARTING VALUES FOR WITHIN LEVEL, LATENT CLASS 1
+
+
+           NU
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+                0.000         0.000         0.000         0.000         0.000
+
+
+           LAMBDA
+              I             S             Q
+              ________      ________      ________
+ MAR            1.000         0.000         0.000
+ APR            1.000         1.000         1.000
+ MAY            1.000         2.000         4.000
+ JUN            1.000         3.000         9.000
+ JUL            1.000         4.000        16.000
+
+
+           THETA
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR           31.780
+ APR            0.000        44.997
+ MAY            0.000         0.000        35.824
+ JUN            0.000         0.000         0.000        35.722
+ JUL            0.000         0.000         0.000         0.000        26.099
+
+
+           ALPHA
+              I             S             Q
+              ________      ________      ________
+                0.000         0.000         0.000
+
+
+           BETA
+              I             S             Q
+              ________      ________      ________
+ I              0.000         0.000         0.000
+ S              0.000         0.000         0.000
+ Q              0.000         0.000         0.000
+
+
+           PSI
+              I             S             Q
+              ________      ________      ________
+ I              0.000
+ S              0.000         0.000
+ Q              0.000         0.000         0.000
+
+
+     STARTING VALUES FOR BETWEEN LEVEL, LATENT CLASS 1
+
+
+           NU
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+                3.641        -4.354        -6.618        -3.309        -1.211
+
+
+           LAMBDA
+              I             S             Q
+              ________      ________      ________
+ MAR            0.000         0.000         0.000
+ APR            0.000         0.000         0.000
+ MAY            0.000         0.000         0.000
+ JUN            0.000         0.000         0.000
+ JUL            0.000         0.000         0.000
+
+
+           THETA
+              MAR           APR           MAY           JUN           JUL
+              ________      ________      ________      ________      ________
+ MAR            0.000
+ APR            0.000         0.000
+ MAY            0.000         0.000         0.000
+ JUN            0.000         0.000         0.000         0.000
+ JUL            0.000         0.000         0.000         0.000         0.000
+
+
+           ALPHA
+              I             S             Q
+              ________      ________      ________
+                0.000         0.000         0.000
+
+
+           BETA
+              I             S             Q
+              ________      ________      ________
+ I              0.000         0.000         0.000
+ S              0.000         0.000         0.000
+ Q              0.000         0.000         0.000
+
+
+           PSI
+              I             S             Q
+              ________      ________      ________
+ I              0.000
+ S              0.000         0.000
+ Q              0.000         0.000         0.000
+
+
+     STARTING VALUES FOR LATENT CLASS REGRESSION MODEL PART
+
+
+           ALPHA(C)
+              C#1
+              ________
+                0.000
+
+
+           GAMMA(C)
+              I             S             Q
+              ________      ________      ________
+ C#1            0.000         0.000         0.000
+
+
+TECHNICAL 8 OUTPUT
+
+
+   E STEP  ITER  LOGLIKELIHOOD    ABS CHANGE   REL CHANGE  ALGORITHM
+              1 -0.74444174D+04    0.0000000    0.0000000  EM
+              2 -0.71346494D+04  309.7679241    0.0416108  EM
+              3 -0.71346494D+04    0.0000000    0.0000000  EM
+
+
+SAMPLE STATISTICS FOR ESTIMATED FACTOR SCORES
+
+
+     SAMPLE STATISTICS
+
+
+           Means
+              I             I_SE          S             S_SE          Q
+              ________      ________      ________      ________      ________
+                0.000         0.000         0.000         0.000         0.000
+
+
+           Means
+              Q_SE          B_MAR         B_MAR_SE      B_APR         B_APR_SE
+              ________      ________      ________      ________      ________
+                0.000         3.641         0.000        -4.354         0.000
+
+
+           Means
+              B_MAY         B_MAY_SE      B_JUN         B_JUN_SE      B_JUL
+              ________      ________      ________      ________      ________
+               -6.618         0.000        -3.309         0.000        -1.211
+
+
+           Means
+              B_JUL_SE      C_I           C_I_SE        C_S           C_S_SE
+              ________      ________      ________      ________      ________
+                0.000         0.000         0.000         0.000         0.000
+
+
+           Means
+              C_Q           C_Q_SE        CB_MAR        CB_MAR_S      CB_APR
+              ________      ________      ________      ________      ________
+                0.000         0.000         3.641         0.000        -4.354
+
+
+           Means
+              CB_APR_S      CB_MAY        CB_MAY_S      CB_JUN        CB_JUN_S
+              ________      ________      ________      ________      ________
+                0.000        -6.618         0.000        -3.309         0.000
+
+
+           Means
+              CB_JUL        CB_JUL_S
+              ________      ________
+               -1.211         0.000
+
+
+           Covariances
+              I             I_SE          S             S_SE          Q
+              ________      ________      ________      ________      ________
+ I              0.000
+ I_SE           0.000         0.000
+ S              0.000         0.000         0.000
+ S_SE           0.000         0.000         0.000         0.000
+ Q              0.000         0.000         0.000         0.000         0.000
+ Q_SE           0.000         0.000         0.000         0.000         0.000
+ B_MAR          0.000         0.000         0.000         0.000         0.000
+ B_MAR_SE       0.000         0.000         0.000         0.000         0.000
+ B_APR          0.000         0.000         0.000         0.000         0.000
+ B_APR_SE       0.000         0.000         0.000         0.000         0.000
+ B_MAY          0.000         0.000         0.000         0.000         0.000
+ B_MAY_SE       0.000         0.000         0.000         0.000         0.000
+ B_JUN          0.000         0.000         0.000         0.000         0.000
+ B_JUN_SE       0.000         0.000         0.000         0.000         0.000
+ B_JUL          0.000         0.000         0.000         0.000         0.000
+ B_JUL_SE       0.000         0.000         0.000         0.000         0.000
+ C_I            0.000         0.000         0.000         0.000         0.000
+ C_I_SE         0.000         0.000         0.000         0.000         0.000
+ C_S            0.000         0.000         0.000         0.000         0.000
+ C_S_SE         0.000         0.000         0.000         0.000         0.000
+ C_Q            0.000         0.000         0.000         0.000         0.000
+ C_Q_SE         0.000         0.000         0.000         0.000         0.000
+ CB_MAR         0.000         0.000         0.000         0.000         0.000
+ CB_MAR_S       0.000         0.000         0.000         0.000         0.000
+ CB_APR         0.000         0.000         0.000         0.000         0.000
+ CB_APR_S       0.000         0.000         0.000         0.000         0.000
+ CB_MAY         0.000         0.000         0.000         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              Q_SE          B_MAR         B_MAR_SE      B_APR         B_APR_SE
+              ________      ________      ________      ________      ________
+ Q_SE           0.000
+ B_MAR          0.000         0.000
+ B_MAR_SE       0.000         0.000         0.000
+ B_APR          0.000         0.000         0.000         0.000
+ B_APR_SE       0.000         0.000         0.000         0.000         0.000
+ B_MAY          0.000         0.000         0.000         0.000         0.000
+ B_MAY_SE       0.000         0.000         0.000         0.000         0.000
+ B_JUN          0.000         0.000         0.000         0.000         0.000
+ B_JUN_SE       0.000         0.000         0.000         0.000         0.000
+ B_JUL          0.000         0.000         0.000         0.000         0.000
+ B_JUL_SE       0.000         0.000         0.000         0.000         0.000
+ C_I            0.000         0.000         0.000         0.000         0.000
+ C_I_SE         0.000         0.000         0.000         0.000         0.000
+ C_S            0.000         0.000         0.000         0.000         0.000
+ C_S_SE         0.000         0.000         0.000         0.000         0.000
+ C_Q            0.000         0.000         0.000         0.000         0.000
+ C_Q_SE         0.000         0.000         0.000         0.000         0.000
+ CB_MAR         0.000         0.000         0.000         0.000         0.000
+ CB_MAR_S       0.000         0.000         0.000         0.000         0.000
+ CB_APR         0.000         0.000         0.000         0.000         0.000
+ CB_APR_S       0.000         0.000         0.000         0.000         0.000
+ CB_MAY         0.000         0.000         0.000         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              B_MAY         B_MAY_SE      B_JUN         B_JUN_SE      B_JUL
+              ________      ________      ________      ________      ________
+ B_MAY          0.000
+ B_MAY_SE       0.000         0.000
+ B_JUN          0.000         0.000         0.000
+ B_JUN_SE       0.000         0.000         0.000         0.000
+ B_JUL          0.000         0.000         0.000         0.000         0.000
+ B_JUL_SE       0.000         0.000         0.000         0.000         0.000
+ C_I            0.000         0.000         0.000         0.000         0.000
+ C_I_SE         0.000         0.000         0.000         0.000         0.000
+ C_S            0.000         0.000         0.000         0.000         0.000
+ C_S_SE         0.000         0.000         0.000         0.000         0.000
+ C_Q            0.000         0.000         0.000         0.000         0.000
+ C_Q_SE         0.000         0.000         0.000         0.000         0.000
+ CB_MAR         0.000         0.000         0.000         0.000         0.000
+ CB_MAR_S       0.000         0.000         0.000         0.000         0.000
+ CB_APR         0.000         0.000         0.000         0.000         0.000
+ CB_APR_S       0.000         0.000         0.000         0.000         0.000
+ CB_MAY         0.000         0.000         0.000         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              B_JUL_SE      C_I           C_I_SE        C_S           C_S_SE
+              ________      ________      ________      ________      ________
+ B_JUL_SE       0.000
+ C_I            0.000         0.000
+ C_I_SE         0.000         0.000         0.000
+ C_S            0.000         0.000         0.000         0.000
+ C_S_SE         0.000         0.000         0.000         0.000         0.000
+ C_Q            0.000         0.000         0.000         0.000         0.000
+ C_Q_SE         0.000         0.000         0.000         0.000         0.000
+ CB_MAR         0.000         0.000         0.000         0.000         0.000
+ CB_MAR_S       0.000         0.000         0.000         0.000         0.000
+ CB_APR         0.000         0.000         0.000         0.000         0.000
+ CB_APR_S       0.000         0.000         0.000         0.000         0.000
+ CB_MAY         0.000         0.000         0.000         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              C_Q           C_Q_SE        CB_MAR        CB_MAR_S      CB_APR
+              ________      ________      ________      ________      ________
+ C_Q            0.000
+ C_Q_SE         0.000         0.000
+ CB_MAR         0.000         0.000         0.000
+ CB_MAR_S       0.000         0.000         0.000         0.000
+ CB_APR         0.000         0.000         0.000         0.000         0.000
+ CB_APR_S       0.000         0.000         0.000         0.000         0.000
+ CB_MAY         0.000         0.000         0.000         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              CB_APR_S      CB_MAY        CB_MAY_S      CB_JUN        CB_JUN_S
+              ________      ________      ________      ________      ________
+ CB_APR_S       0.000
+ CB_MAY         0.000         0.000
+ CB_MAY_S       0.000         0.000         0.000
+ CB_JUN         0.000         0.000         0.000         0.000
+ CB_JUN_S       0.000         0.000         0.000         0.000         0.000
+ CB_JUL         0.000         0.000         0.000         0.000         0.000
+ CB_JUL_S       0.000         0.000         0.000         0.000         0.000
+
+
+           Covariances
+              CB_JUL        CB_JUL_S
+              ________      ________
+ CB_JUL         0.000
+ CB_JUL_S       0.000         0.000
+
+
+           Correlations
+              I             I_SE          S             S_SE          Q
+              ________      ________      ________      ________      ________
+ I              1.000
+ I_SE         999.000         1.000
+ S            999.000       999.000         1.000
+ S_SE         999.000       999.000       999.000         1.000
+ Q            999.000       999.000       999.000       999.000         1.000
+ Q_SE         999.000       999.000       999.000       999.000       999.000
+ B_MAR        999.000       999.000       999.000       999.000       999.000
+ B_MAR_SE     999.000       999.000       999.000       999.000       999.000
+ B_APR        999.000       999.000       999.000       999.000       999.000
+ B_APR_SE     999.000       999.000       999.000       999.000       999.000
+ B_MAY        999.000       999.000       999.000       999.000       999.000
+ B_MAY_SE     999.000       999.000       999.000       999.000       999.000
+ B_JUN        999.000       999.000       999.000       999.000       999.000
+ B_JUN_SE     999.000       999.000       999.000       999.000       999.000
+ B_JUL        999.000       999.000       999.000       999.000       999.000
+ B_JUL_SE     999.000       999.000       999.000       999.000       999.000
+ C_I          999.000       999.000       999.000       999.000       999.000
+ C_I_SE       999.000       999.000       999.000       999.000       999.000
+ C_S          999.000       999.000       999.000       999.000       999.000
+ C_S_SE       999.000       999.000       999.000       999.000       999.000
+ C_Q          999.000       999.000       999.000       999.000       999.000
+ C_Q_SE       999.000       999.000       999.000       999.000       999.000
+ CB_MAR       999.000       999.000       999.000       999.000       999.000
+ CB_MAR_S     999.000       999.000       999.000       999.000       999.000
+ CB_APR       999.000       999.000       999.000       999.000       999.000
+ CB_APR_S     999.000       999.000       999.000       999.000       999.000
+ CB_MAY       999.000       999.000       999.000       999.000       999.000
+ CB_MAY_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUN       999.000       999.000       999.000       999.000       999.000
+ CB_JUN_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              Q_SE          B_MAR         B_MAR_SE      B_APR         B_APR_SE
+              ________      ________      ________      ________      ________
+ Q_SE           1.000
+ B_MAR        999.000         1.000
+ B_MAR_SE     999.000       999.000         1.000
+ B_APR        999.000       999.000       999.000         1.000
+ B_APR_SE     999.000       999.000       999.000       999.000         1.000
+ B_MAY        999.000       999.000       999.000       999.000       999.000
+ B_MAY_SE     999.000       999.000       999.000       999.000       999.000
+ B_JUN        999.000       999.000       999.000       999.000       999.000
+ B_JUN_SE     999.000       999.000       999.000       999.000       999.000
+ B_JUL        999.000       999.000       999.000       999.000       999.000
+ B_JUL_SE     999.000       999.000       999.000       999.000       999.000
+ C_I          999.000       999.000       999.000       999.000       999.000
+ C_I_SE       999.000       999.000       999.000       999.000       999.000
+ C_S          999.000       999.000       999.000       999.000       999.000
+ C_S_SE       999.000       999.000       999.000       999.000       999.000
+ C_Q          999.000       999.000       999.000       999.000       999.000
+ C_Q_SE       999.000       999.000       999.000       999.000       999.000
+ CB_MAR       999.000       999.000       999.000       999.000       999.000
+ CB_MAR_S     999.000       999.000       999.000       999.000       999.000
+ CB_APR       999.000       999.000       999.000       999.000       999.000
+ CB_APR_S     999.000       999.000       999.000       999.000       999.000
+ CB_MAY       999.000       999.000       999.000       999.000       999.000
+ CB_MAY_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUN       999.000       999.000       999.000       999.000       999.000
+ CB_JUN_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              B_MAY         B_MAY_SE      B_JUN         B_JUN_SE      B_JUL
+              ________      ________      ________      ________      ________
+ B_MAY          1.000
+ B_MAY_SE     999.000         1.000
+ B_JUN        999.000       999.000         1.000
+ B_JUN_SE     999.000       999.000       999.000         1.000
+ B_JUL        999.000       999.000       999.000       999.000         1.000
+ B_JUL_SE     999.000       999.000       999.000       999.000       999.000
+ C_I          999.000       999.000       999.000       999.000       999.000
+ C_I_SE       999.000       999.000       999.000       999.000       999.000
+ C_S          999.000       999.000       999.000       999.000       999.000
+ C_S_SE       999.000       999.000       999.000       999.000       999.000
+ C_Q          999.000       999.000       999.000       999.000       999.000
+ C_Q_SE       999.000       999.000       999.000       999.000       999.000
+ CB_MAR       999.000       999.000       999.000       999.000       999.000
+ CB_MAR_S     999.000       999.000       999.000       999.000       999.000
+ CB_APR       999.000       999.000       999.000       999.000       999.000
+ CB_APR_S     999.000       999.000       999.000       999.000       999.000
+ CB_MAY       999.000       999.000       999.000       999.000       999.000
+ CB_MAY_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUN       999.000       999.000       999.000       999.000       999.000
+ CB_JUN_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              B_JUL_SE      C_I           C_I_SE        C_S           C_S_SE
+              ________      ________      ________      ________      ________
+ B_JUL_SE       1.000
+ C_I          999.000         1.000
+ C_I_SE       999.000       999.000         1.000
+ C_S          999.000       999.000       999.000         1.000
+ C_S_SE       999.000       999.000       999.000       999.000         1.000
+ C_Q          999.000       999.000       999.000       999.000       999.000
+ C_Q_SE       999.000       999.000       999.000       999.000       999.000
+ CB_MAR       999.000       999.000       999.000       999.000       999.000
+ CB_MAR_S     999.000       999.000       999.000       999.000       999.000
+ CB_APR       999.000       999.000       999.000       999.000       999.000
+ CB_APR_S     999.000       999.000       999.000       999.000       999.000
+ CB_MAY       999.000       999.000       999.000       999.000       999.000
+ CB_MAY_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUN       999.000       999.000       999.000       999.000       999.000
+ CB_JUN_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              C_Q           C_Q_SE        CB_MAR        CB_MAR_S      CB_APR
+              ________      ________      ________      ________      ________
+ C_Q            1.000
+ C_Q_SE       999.000         1.000
+ CB_MAR       999.000       999.000         1.000
+ CB_MAR_S     999.000       999.000       999.000         1.000
+ CB_APR       999.000       999.000       999.000       999.000         1.000
+ CB_APR_S     999.000       999.000       999.000       999.000       999.000
+ CB_MAY       999.000       999.000       999.000       999.000       999.000
+ CB_MAY_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUN       999.000       999.000       999.000       999.000       999.000
+ CB_JUN_S     999.000       999.000       999.000       999.000       999.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              CB_APR_S      CB_MAY        CB_MAY_S      CB_JUN        CB_JUN_S
+              ________      ________      ________      ________      ________
+ CB_APR_S       1.000
+ CB_MAY       999.000         1.000
+ CB_MAY_S     999.000       999.000         1.000
+ CB_JUN       999.000       999.000       999.000         1.000
+ CB_JUN_S     999.000       999.000       999.000       999.000         1.000
+ CB_JUL       999.000       999.000       999.000       999.000       999.000
+ CB_JUL_S     999.000       999.000       999.000       999.000       999.000
+
+
+           Correlations
+              CB_JUL        CB_JUL_S
+              ________      ________
+ CB_JUL         1.000
+ CB_JUL_S     999.000         1.000
+
+
+PLOT INFORMATION
+
+The following plots are available:
+
+  Histograms (sample values, estimated factor scores)
+  Scatterplots (sample values, estimated factor scores)
+  Sample means
+  Estimated means, medians, modes, and percentiles
+  Sample and estimated means
+  Latent variable distribution plots
+  Observed individual values
+  Estimated means and observed individual values
+
+DIAGRAM INFORMATION
+
+  Mplus diagrams are currently not available for Mixture analysis.
+  No diagram output was produced.
+
+
+     Beginning Time:  10:32:39
+        Ending Time:  10:32:39
+       Elapsed Time:  00:00:00
+
+
+Mplus VERSION 8.5 DEMO has the following limitations:
+  Maximum number of dependent variables: 6
+  Maximum number of independent variables: 2
+  Maximum number of between variables: 2
+  Maximum number of continuous latent variables in time series analysis: 2
+
+
+MUTHEN & MUTHEN
+3463 Stoner Ave.
+Los Angeles, CA  90066
+
+Tel: (310) 391-9971
+Fax: (310) 391-8971
+Web: www.StatModel.com
+Support: Support@StatModel.com
+
+Copyright (c) 1998-2020 Muthen & Muthen
