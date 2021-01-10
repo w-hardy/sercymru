@@ -588,6 +588,7 @@ oc_gp_fcsts <-
   read_rds("../data/oc_gp_fcsts.rds")
 ```
 
+* 2941.64 seconds 2021-01-08
 
 ## Discrepancies
 
@@ -702,6 +703,42 @@ best_model_gp %>%
   theme(legend.position = "none")
 ```
 
+```{r}
+library(tidyLPA)
+
+gp_lpa_fit <- 
+  best_model_gp %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(oc_gp_fcsts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(oc_monthly_quantity_gp, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - .mean,
+         z_discrepancy = discrepancy/sd)  %>%
+    select(discrepancy, regional_unit, datename) %>%
+  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
+  ungroup() %>% 
+  select(-regional_unit) %>% 
+  estimate_profiles(1:8, models = c(1:3, 6)
+                    #variances = c("equal", "varying"),
+                    #covariances = c("zero", "varying")
+                    ) 
+
+gp_lpa_fit %>% 
+  compare_solutions(statistics = c("AIC", "BIC"))
+
+gp_lpa_fit %>% 
+  compare_solutions(statistics = c("AIC", "BIC")) %>% 
+  .[[1]] %>% 
+  ggplot(aes(x = Classes, y = BIC, group = Model, colour = as.factor(Model))) +
+  geom_line()
+
+gp_lpa_fit %>%
+  plot_profiles(x = ., rawdata = FALSE)
+```
 
 
 ```{r}
@@ -731,8 +768,22 @@ best_model_gp %>%
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 source("../r_scripts/functions/mplus_plotting.R")
-mplus.view.plots("../mplus_analyses/oc_gp/oac_discrep_3_class_bayes.gh5")
-mplus.plot.estimated_means("../mplus_analyses/oc_gp/oac_discrep_3_class_bayes.gh5")
+mplus.view.plots("../mplus_analyses/oc_gp/oc_discrep_2_class_ml.gh5")
+mplus.plot.estimated_means("../mplus_analyses/oc_gp/oc_discrep_2_class_ml.gh5")
+mplus_models <- MplusAutomation::readModels("../mplus_analyses/oc_gp")
+
+mplus_models$oc_discrep_1_class_bayes.out$summaries$BIC
+
+mplus_model_summaries <- 
+  MplusAutomation::readModels("../mplus_analyses/oc_gp", what = "summaries", quiet = TRUE)
+
+mplus_model_summaries$oc_discrep_1_class_bayes.out$summaries %>% 
+  squash() %>% 
+  as_tibble()
+
+length(mplus_model_summaries)
+map_dfr(.x = 1:length(mplus_model_summaries), 
+        .f = ~mplus_model_summaries[[.x]]$summaries$BIC)
 ```
