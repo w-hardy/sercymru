@@ -12,8 +12,7 @@ cluster regional_unit mar apr may jun jul
 IDvariable is regional_unit;
 
 USEVARIABLE ARE
-mar-jul
-;
+mar-jul;
 
 CLASSES =  c (6);
 
@@ -35,7 +34,7 @@ i s q| mar@0 apr@1  may@2 jun@3 jul@4;
 
   
 OUTPUT:
-TECH1 SAMPSTAT tech8;
+TECH1 TECH8;
 
 PLOT:
 TYPE = PLOT1 PLOT2 PlOT3;

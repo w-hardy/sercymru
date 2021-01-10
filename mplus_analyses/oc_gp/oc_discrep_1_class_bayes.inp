@@ -6,14 +6,12 @@ FILE IS ../../data/mplus/oc_gp_discrep.csv;
 
 VARIABLE: 
 NAMES ARE 
-cluster regional_unit mar apr may jun jul
-;
+cluster regional_unit mar apr may jun jul;
 
 IDvariable is regional_unit;
 
 USEVARIABLE ARE
-mar-jul
-;
+mar-jul;
 
 CLASSES =  c (1);
 
@@ -27,7 +25,7 @@ bconvergence = .01;
 TYPE = mixture;
 bseed is 111;
 
-MODEL: 
+MODEL:
 %overall%
 
 i s q | mar@0 apr@1  may@2 jun@3 jul@4;
@@ -35,7 +33,7 @@ i-q@0;
 
   
 OUTPUT:
-TECH1 SAMPSTAT tech8;
+TECH1 tech8;
 
 PLOT:
 TYPE = PLOT1 PLOT2 PlOT3;

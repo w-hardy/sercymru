@@ -1,4 +1,4 @@
-TITLE: oc discrepancy 4 class ml;
+TITLE: oc discrepancy 6 class ml;
 
 DATA: 
 FILE IS ../../data/mplus/oc_gp_discrep.csv;
@@ -6,14 +6,15 @@ FILE IS ../../data/mplus/oc_gp_discrep.csv;
 
 VARIABLE: 
 NAMES ARE 
-cluster regional_unit mar apr may jun jul;
+cluster regional_unit mar apr may jun jul
+;
 
 IDvariable is regional_unit;
 
 USEVARIABLE ARE
 mar-jul;
 
-CLASSES =  c (4);
+CLASSES =  c (6);
 
 MISSING ARE ALL (-999);
 
