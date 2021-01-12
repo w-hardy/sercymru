@@ -9,7 +9,7 @@ output:
 
 ```{r setup}
 ## Packages
-# devtools::install_github("https://github.com/w-hardy/serCymruTools")
+devtools::install_github("https://github.com/w-hardy/serCymruTools")
 library(tidyverse)
 library(lubridate)
 library(tsibble)
@@ -175,8 +175,8 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
       accuracy(data_test)
   }
   
-  # plan(cluster) # Set up parallel processing to decrease computation time
-  plan(multisession) # Set up parallel processing to decrease computation time
+  plan(cluster, 8) # Set up parallel processing to decrease computation time
+  #plan(multisession) # Set up parallel processing to decrease computation time
   # Prophet models won't run with plan(multisession) so need to be run
   # sequentially. Is it worth trying to write this in Python and pass it back
   # to R?
@@ -206,7 +206,7 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
 
 regionalJointFcsts <- function(data, h ="5 months"){
   regions <- unique(data$regional_unit)
-  plan(multisession)
+  plan(cluster)
   fable_fit <-
     future_map_dfr(.x = regions,
                    .f = ~fableModels(filter(data, regional_unit ==.x)),
@@ -449,7 +449,7 @@ oac_p_hb_cv_models %>%
 * 418.410 seconds with neur_net removed 2021-01-11
 
 ```{r}
-plan(multisession)
+plan(cluster)
 system.time(oac_p_hb_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_hb_pre_cv19))
 plan(sequential)
 oac_p_hb_fcsts %>%
@@ -503,7 +503,7 @@ oac_p_gp_cluster_cv_models %>%
 * 2059.159 seconds 2021-01-11
 
 ```{r}
-plan(multisession)
+plan(cluster)
 system.time(oac_p_gp_cluster_fcsts <- 
               regionalJointFcsts(oac_p_monthly_quantity_cluster_pre_cv19))
 plan(sequential)
