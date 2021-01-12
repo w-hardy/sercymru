@@ -55,90 +55,88 @@ propRegional <- function(data, region, datename = datename, unit = Quantity,
 }
 
 # Modifying functions to model log(n) as using proportion data
+fableModels <- function(data){
+  if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
+  
+  data %>%
+    mutate(datename = yearmonth(datename)) %>%
+    model(trend_model1 = TSLM(log(n) ~ trend()),#time series linear model
+          trend_model2 = TSLM(log(n) ~ trend() + season("year")),
+          ets1 = ETS(log(n) ~ trend()),
+          ets2 = ETS(log(n) ~ trend() + season("A")),
+          ets3 = ETS(log(n) ~ trend() + season("M")),
+          arima = ARIMA(log(n), stepwise = FALSE, approximation = FALSE),
+          comb1 = combination_model(TSLM(log(n) ~ trend()),
+                                    ETS(log(n) ~ trend())),
+          comb2 = combination_model(TSLM(log(n) ~ trend() + season("year")),
+                                    ETS(log(n) ~ trend() + season("A"))),
+          stl_dcmp1 = decomposition_model(STL(log(n) ~ trend(),
+                                              iterations = 1000,
+                                              robust = TRUE),
+                                          SNAIVE(season_adjust)),
+          stl_dcmp2 = decomposition_model(STL(log(n) ~ trend() + season(),
+                                              iterations = 1000,
+                                              robust = TRUE),
+                                          SNAIVE(season_adjust)),
+          s_naive = SNAIVE(log(n)))
+}
+
+prophetModels <- function(data){
+  if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
+  
+  oc_prophet_model1 <-
+    fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
+                             season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model2 <-
+    fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
+                             season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model3 <-
+    fable.prophet::prophet(log(n) ~ growth("linear") +
+                             season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model4 <-
+    fable.prophet::prophet(log(n) ~ growth("linear") +
+                             season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model5 <-
+    fable.prophet::prophet(log(n) ~ season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model6 <-
+    fable.prophet::prophet(log(n) ~ season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model7 <-
+    fable.prophet::prophet(log(n) ~ holiday(holidays))
+  oc_prophet_model8 <-
+    fable.prophet::prophet(log(n))
+  
+  data %>%
+    mutate(datename = yearmonth(datename)) %>%
+    model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3,
+          oc_prophet_model4, oc_prophet_model5, oc_prophet_model6,
+          oc_prophet_model7, oc_prophet_model8, .safely = TRUE)
+}
+
+holidays <-
+  bind_rows(tibble(holiday = "christmas",
+                   ds = as.Date(c("2016-12-25", "2017-12-25", "2018-12-25",
+                                  "2019-12-25", "2020-12-25", "2021-12-25")),
+                   lower_window = -1,
+                   upper_window = 1),
+            
+            tibble(holiday = "easter", # Sunday
+                   ds = as.Date(c("2016-03-27", "2017-04-16", "2018-04-01",
+                                  "2019-04-21", "2020-04-12", "2021-04-04")),
+                   lower_window = -2,
+                   upper_window = 1))
 regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
   
   # CV accuracy for fableModels() and prophetModels()
   
   regions <- unique(data$regional_unit) # Get unique regional_units for map()
   
-  fableModels <- function(data){
-    if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
-    
-    data %>%
-      mutate(datename = yearmonth(datename)) %>%
-      model(trend_model1 = TSLM(log(n) ~ trend()),#time series linear model
-            trend_model2 = TSLM(log(n) ~ trend() + season("year")),
-            ets1 = ETS(log(n) ~ trend()),
-            ets2 = ETS(log(n) ~ trend() + season("A")),
-            ets3 = ETS(log(n) ~ trend() + season("M")),
-            arima = ARIMA(log(n), stepwise = FALSE, approximation = FALSE),
-            neur_net = NNETAR(log(n)),
-            comb1 = combination_model(TSLM(log(n) ~ trend()),
-                                      ETS(log(n) ~ trend())),
-            comb2 = combination_model(TSLM(log(n) ~ trend() + season("year")),
-                                      ETS(log(n) ~ trend() + season("A"))),
-            stl_dcmp1 = decomposition_model(STL(log(n) ~ trend(),
-                                                iterations = 1000,
-                                                robust = TRUE),
-                                            SNAIVE(season_adjust)),
-            stl_dcmp2 = decomposition_model(STL(log(n) ~ trend() + season(),
-                                                iterations = 1000,
-                                                robust = TRUE),
-                                            SNAIVE(season_adjust)),
-            s_naive = SNAIVE(log(n)))
-  }
-  
-  prophetModels <- function(data){
-    if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
-    
-    oc_prophet_model1 <-
-      fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
-                               season("year", type = "additive") +
-                               holiday(holidays))
-    oc_prophet_model2 <-
-      fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
-                               season("year", type = "multiplicative") +
-                               holiday(holidays))
-    oc_prophet_model3 <-
-      fable.prophet::prophet(log(n) ~ growth("linear") +
-                               season("year", type = "additive") +
-                               holiday(holidays))
-    oc_prophet_model4 <-
-      fable.prophet::prophet(log(n) ~ growth("linear") +
-                               season("year", type = "multiplicative") +
-                               holiday(holidays))
-    oc_prophet_model5 <-
-      fable.prophet::prophet(log(n) ~ season("year", type = "additive") +
-                               holiday(holidays))
-    oc_prophet_model6 <-
-      fable.prophet::prophet(log(n) ~ season("year", type = "multiplicative") +
-                               holiday(holidays))
-    oc_prophet_model7 <-
-      fable.prophet::prophet(log(n) ~ holiday(holidays))
-    oc_prophet_model8 <-
-      fable.prophet::prophet(log(n))
-    
-    data %>%
-      mutate(datename = yearmonth(datename)) %>%
-      model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3,
-            oc_prophet_model4, oc_prophet_model5, oc_prophet_model6,
-            oc_prophet_model7, oc_prophet_model8, .safely = TRUE)
-  }
-  
-  holidays <-
-    bind_rows(tibble(holiday = "christmas",
-                     ds = as.Date(c("2016-12-25", "2017-12-25", "2018-12-25",
-                                    "2019-12-25", "2020-12-25", "2021-12-25")),
-                     lower_window = -1,
-                     upper_window = 1),
-              
-              tibble(holiday = "easter", # Sunday
-                     ds = as.Date(c("2016-03-27", "2017-04-16", "2018-04-01",
-                                    "2019-04-21", "2020-04-12", "2021-04-04")),
-                     lower_window = -2,
-                     upper_window = 1))
-  
-  
+
   fableCV <- function(data){ # Return CV model accuracy for fableModels()
     data_test <-
       data %>%
@@ -156,7 +154,6 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
       fableModels() %>%
       forecast(h = cv_dist) %>%
       accuracy(data_test)
-    
   }
   
   prophetCV <- function(data){# Return CV model accuracy for prophetModels()
@@ -207,6 +204,54 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
     arrange(RMSE, MAE)
 }
 
+regionalJointFcsts <- function(data, h ="5 months"){
+  regions <- unique(data$regional_unit)
+  plan(multisession)
+  fable_fit <-
+    future_map_dfr(.x = regions,
+                   .f = ~fableModels(filter(data, regional_unit ==.x)),
+                   .options = furrr_options(seed = TRUE))
+  message("fable fits complete")
+
+  fable_fcst <- fable_fit %>%
+    forecast(h = h) %>%
+    as_tibble()
+  message("fable forecasts complete")
+
+
+  prophet_fit <-
+    future_map_dfr(.x = regions,
+                   .f = ~prophetModels(filter(data, regional_unit ==.x)),
+                   .options = furrr_options(seed = TRUE))
+  message("prophet fits complete")
+
+  prophet_fcst <-
+    forecast(prophet_fit, h = h) %>%
+    as_tibble()
+  # Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
+  # This may also be influencing accuracy
+
+  message("prophet forecasts complete")
+  plan(sequential)
+  # prophetModels now being run in parallel. Needed to reinstall prophet from
+  # source
+
+  # joint_fit <-
+  #   left_join(fable_fit, prophet_fit, by = "regional_unit")
+  joint_fcst <-
+    bind_rows(fable_fcst, prophet_fcst) %>%
+    mutate(lb_95 = quantile(n, .025),
+           lb_80 = quantile(n, .1),
+           med = median(n),
+           ub_80 = quantile(n, .9),
+           ub_95 = quantile(n, .975),
+           sd = distributional::variance(n)^2,
+           dist = n,
+           n = NULL)
+
+  return(joint_fcst)
+}
+
 ```
 
 ## Preparing data
@@ -224,14 +269,14 @@ warf <- "0208020V0"
 # con <- DBI::dbConnect(RSQLite::SQLite(), 
 #                       "../OneDrive/1_data/gpextract/db-gpextract.sqlite")
 # db.gpextract <- tbl(con, "gpextract")
-# oac_p <- db.gpextract %>%
+# oac <- db.gpextract %>%
 #   filter(bnfchem %in% oral_anticoagulants) %>%
 #   collect() %>%
 #   mutate(datename = dmy(paste0("28-", datename)))  # Add day component to date and convert to date-time object
 # DBI::dbDisconnect(con)
 # 
 # ## Write to local file
-# oac_p %>%
+# oac %>%
 #   write_rds("../data/oral_anticoagulants.rds")
 
 ## Read from local file
@@ -240,11 +285,11 @@ gp <- read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rd
          N = NULL) %>% 
   filter(year == 2020) # Do something better. Is npat important for the proportion?
 
-oac_p <- read_rds("../data/oral_anticoagulants.rds") 
+oac <- read_rds("../data/oral_anticoagulants.rds") 
 
 ## Sort into monthly count data
 oac_p_monthly_count <- 
-  oac_p %>% 
+  oac %>% 
   group_by(datename, bnfchem) %>% 
   summarise(n = sum(Quantity)) %>% 
   mutate(n = 100 * n / sum(n), # make it a percentage rather than proportion
@@ -254,18 +299,18 @@ oac_p_monthly_count <-
   as_tsibble(index = datename)
 
 oac_p_monthly_quantity_hb <- 
-  right_join(oac_p, select(gp, c(practiceid, hboard)), 
+  right_join(oac, select(gp, c(practiceid, hboard)), 
              by = c("PracticeID" = "practiceid")) %>%
   propRegional(region = hboard, datename = datename, unit = Quantity,
                bnf = warf) 
 
 oac_p_monthly_quantity_cluster <- 
-  right_join(oac_p, select(gp, c(practiceid, cluster)), 
+  right_join(oac, select(gp, c(practiceid, cluster)), 
              by = c("PracticeID" = "practiceid")) %>%
   propRegional(cluster, datename, Quantity, bnf = warf)
 
 oac_p_monthly_quantity_gp <- 
-  propRegional(oac_p, PracticeID, datename, Quantity, bnf = warf)
+  propRegional(oac, PracticeID, datename, Quantity, bnf = warf)
   
 
 ## Sort into monthly count data pre-lockdown (2020-03-23)
@@ -294,7 +339,7 @@ oac_p_monthly_quantity_gp_pre_cv19 <-
 ### 2016-2020 plot of all oac_p prescriptions 
 
 ```{r oac_p-monthly-ts-plot, fig.cap="Total quantity of combined oral anticoagulants prescribed per month."}
-oac_p %>% 
+oac %>% 
   group_by(datename) %>% 
   summarise(n = sum(Quantity)) %>% 
   tsibble() %>% 
@@ -302,7 +347,7 @@ oac_p %>%
   geom_vline(xintercept = dmy("23-March-2020"), colour = "red") # add line to mark the start of lockdown
 ```
 
-```{r oac-p-monthly-ts-plot, fig.cap="Total quantity of combined oral anticoagulants prescribed per month."}
+```{r oac-p-monthly-ts-plot, fig.cap="Warfarin prescribing as a percentage of all oral anticoagulants prescribed per month."}
 oac_p_monthly_count %>% 
   select(datename, n) %>% 
   autoplot() +
@@ -313,7 +358,8 @@ oac_p_monthly_count %>%
 ### Seasonality
 
 ```{r oac_p-monthly-seasonality-plot}
-df <- oac_p_monthly_count_pre_cv19 %>% 
+df <- 
+  oac_p_monthly_count_pre_cv19 %>% 
   mutate(month = as.factor(month(datename, label = TRUE, abbr = TRUE)),
          year = as.factor(year(datename))) 
 
@@ -400,10 +446,12 @@ oac_p_hb_cv_models %>%
 ```
 
 * 724.044 seconds with multisession prophetModels()
+* 418.410 seconds with neur_net removed 2021-01-11
 
 ```{r}
+plan(multisession)
 system.time(oac_p_hb_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_hb_pre_cv19))
-
+plan(sequential)
 oac_p_hb_fcsts %>%
   write_rds("../data/oac_p_hb_fcsts.rds")
 
@@ -412,6 +460,7 @@ oac_p_hb_fcsts <-
 ```
 
 * 194.071 seconds 2020-12-10
+* 71.559 seconds 2021-01-11
 
 
 ### By GP Cluster
@@ -451,6 +500,7 @@ oac_p_gp_cluster_cv_models %>%
 ```
 
 * 5514.279 seconds
+* 2059.159 seconds 2021-01-11
 
 ```{r}
 plan(multisession)
@@ -466,7 +516,7 @@ oac_p_gp_cluster_fcsts <-
 ```
 
 * 1266.126 seconds 2020-12-10
-
+* 590.595 seconds 2021-01-11
 
 ### By Practice
 
