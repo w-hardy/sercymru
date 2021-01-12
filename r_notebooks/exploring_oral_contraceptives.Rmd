@@ -9,7 +9,7 @@ output:
 
 ```{r setup}
 ## Packages
-# devtools::install_github("https://github.com/w-hardy/serCymruTools")
+devtools::install_github("https://github.com/w-hardy/serCymruTools")
 library(tidyverse)
 library(lubridate)
 library(tsibble)
@@ -19,6 +19,9 @@ library(fable)
 library(fable.prophet)
 library(feasts)
 library(furrr)
+library(rebus)
+library(MplusAutomation)
+library(tidyLPA)
 library(serCymruTools)
 
 ## Options
@@ -56,7 +59,7 @@ oral_contraceptives <- c(combined_hormonal, progestogen_only)
 
 ## Write to local file
 # oc %>%
-#   write_rds("../data/oral_contraceptives.rds")
+#   saveRDS("../data/oral_contraceptives.rds")
 
 ## Read from local file
 #gp <- read_rds("../data/gp_linked_na_omit.rds")
@@ -421,11 +424,13 @@ augment(fit) %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
+# plan(multisession)
 # system.time(oc_hb_cv_models <-
 #   regionalCV(data = oc_monthly_quantity_hb_pre_cv19))
+# plan(sequential)
 # 
 # oc_hb_cv_models %>%
-#   write_rds("../data/oc_hb_cv_models.rds")
+#   saveRDS("../data/oc_hb_cv_models.rds")
 
 oc_hb_cv_models <- 
   read_rds("../data/oc_hb_cv_models.rds")
@@ -460,7 +465,7 @@ oc_hb_cv_models %>%
 # plan(sequential)
 # 
 # oc_hb_fcsts %>%
-#   write_rds("../data/oc_hb_fcsts.rds")
+#   saveRDS("../data/oc_hb_fcsts.rds")
 
 oc_hb_fcsts <- 
   read_rds("../data/oc_hb_fcsts.rds")
@@ -472,11 +477,13 @@ oc_hb_fcsts <-
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
+# plan(multisession)
 # system.time(oc_gp_cluster_cv_models <-
 #   regionalCV(data = oc_monthly_quantity_cluster_pre_cv19))
+# plan(sequential)
 # 
 # oc_gp_cluster_cv_models %>%
-#   write_rds("../data/oc_gp_cluster_cv_models.rds")
+#   saveRDS("../data/oc_gp_cluster_cv_models.rds")
 
 oc_gp_cluster_cv_models <- 
   read_rds("../data/oc_gp_cluster_cv_models.rds")
@@ -509,11 +516,12 @@ oc_gp_cluster_cv_models %>%
 
 ```{r}
 # plan(multisession)
-# system.time(oc_gp_cluster_fcsts <- regionalJointFcsts(oc_monthly_quantity_cluster_pre_cv19))
+# system.time(oc_gp_cluster_fcsts <- 
+#               regionalJointFcsts(oc_monthly_quantity_cluster_pre_cv19))
 # plan(sequential)
 # 
 # oc_gp_cluster_fcsts %>%
-#   write_rds("../data/oc_gp_cluster_fcsts.rds")
+#   saveRDS("../data/oc_gp_cluster_fcsts.rds")
 
 oc_gp_cluster_fcsts <- 
   read_rds("../data/oc_gp_cluster_fcsts.rds")
@@ -533,13 +541,15 @@ incomplete_gp <- oc_monthly_quantity_gp_pre_cv19 %>%
     .$regional_unit %>% 
     unique()
 
+# plan(multisession)
 # system.time(oc_gp_cv_models <-
-#   oc_monthly_quantity_gp_pre_cv19 %>% 
-#     filter(!regional_unit %in% incomplete_gp) %>% 
+#   oc_monthly_quantity_gp_pre_cv19 %>%
+#     filter(!regional_unit %in% incomplete_gp) %>%
 #               regionalCV())
+# plan(sequential)
 # 
 # oc_gp_cv_models %>%
-#   write_rds("../data/oc_gp_cv_models.rds")
+#   saveRDS("../data/oc_gp_cv_models.rds")
 
 oc_gp_cv_models <- 
   read_rds("../data/oc_gp_cv_models.rds")
@@ -565,27 +575,47 @@ oc_gp_cv_models %>%
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90))
 
-
-
 ```
 
 
 * 2.195e+04 seconds 2020-12-07
 * 25547.266 seconds 2020-12-09
 
+```{r gp-modelling-accuracy}
+best_model_gp <- 
+  oc_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE)
 
-```{r}
+best_model_gp %>% 
+  left_join(select(gp, practiceid, npat, ngp), 
+            by = c("regional_unit" = "practiceid")) %>% 
+  select(-c(.model, .type)) %>% 
+  DataExplorer::plot_correlation()
+
+```
+
+
+
+```{r gp-practice-forecasts}
 # plan(multisession)
 # system.time(oc_gp_fcsts <-
 #               oc_monthly_quantity_gp_pre_cv19 %>%
 #               filter(!regional_unit %in% incomplete_gp) %>%
 #               regionalJointFcsts())
 # plan(sequential)
+# 
 # oc_gp_fcsts %>%
-#   write_rds("../data/oc_gp_fcsts.rds")
+#   saveRDS("../data/oc_gp_fcsts.rds")
 
 oc_gp_fcsts <- 
   read_rds("../data/oc_gp_fcsts.rds")
+
+oc_gp_fcsts %>% 
+  group_by(.model) %>% 
+  count
+
 ```
 
 * 2941.64 seconds 2021-01-08
@@ -650,7 +680,6 @@ best_model_gp_cluster %>%
 ```
 
 ```{r, eval = FALSE}
-library(tidyLPA)
 best_model_gp_cluster %>% 
   select(.model, regional_unit) %>% 
   inner_join(mutate(oc_gp_cluster_fcsts,
@@ -662,16 +691,12 @@ best_model_gp_cluster %>%
             by = c("datename", "regional_unit")) %>% 
   mutate(discrepancy = n - .mean,
          z_discrepancy = discrepancy/sd)  %>%
-    select(discrepancy, regional_unit, datename) %>%
+  select(discrepancy, regional_unit, datename) %>%
   pivot_wider(names_from = datename, values_from = discrepancy) %>% 
   ungroup() %>% 
   select(-regional_unit) %>% 
-  # estimate_profiles(n_profiles = 4, models = 1) %>% plot_profiles()
-    estimate_profiles(1:5,
-                      variances = c("equal", "varying"),
-                      covariances = c("zero", "varying")
-                      ) %>% 
-    compare_solutions(statistics = c("AIC", "BIC"))
+  estimate_profiles(1:6, models = c(1:3, 6)) %>% 
+  compare_solutions(statistics = c("AIC", "BIC"))
 ```
 
 
@@ -685,6 +710,20 @@ best_model_gp <-
   slice(1, .preserve = TRUE)
 
 best_model_gp %>% 
+  ggplot(aes(x = MAPE)) + 
+  geom_histogram()
+
+best_model_gp %>% 
+  group_by(if_else(MAPE < 50, TRUE, FALSE)) %>% 
+  count()
+
+median(best_model_gp$MAPE)
+
+acc_filter_value <- 50
+  
+best_model_gp_discrep <- 
+  best_model_gp %>% 
+  filter(MAPE <= acc_filter_value) %>% 
   select(.model, regional_unit) %>% 
   inner_join(mutate(oc_gp_fcsts,
                     datename = yearmonth(datename)), 
@@ -694,38 +733,43 @@ best_model_gp %>%
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
   mutate(discrepancy = n - .mean,
-         z_discrepancy = discrepancy/sd) %>% 
+         z_discrepancy = discrepancy/sd) 
+
+best_model_gp_discrep %>% 
   ggplot(aes(y = discrepancy)) +
-  # geom_boxplot(aes(x = as.factor(datename))) +
-  geom_line(aes(x = datename, y = discrepancy, colour = as.factor(regional_unit)),
+  geom_line(aes(x = datename, y = discrepancy, 
+                colour = as.factor(regional_unit)),
             alpha = .8, lty = 2) +
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
+
 ```
 
 ```{r}
-library(tidyLPA)
+best_model_gp_discrep %>% 
+  filter(discrepancy < -40)
 
+oc_monthly_quantity_gp %>% 
+  filter(regional_unit %in% c("W97009", "W98053")) %>% 
+  as_tsibble(key = regional_unit, index = datename) %>% 
+  autoplot()
+
+gp %>% 
+  filter(practiceid %in% c("W97009", "W98053"))
+```
+
+* Based on postcodes, these are both University GPs. Or at least, given their procimity to universities, they will likely have large student populations.
+
+#### Latent profile analysis
+
+```{r gp-lpa}
 gp_lpa_fit <- 
-  best_model_gp %>% 
-  select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_fcsts,
-                    datename = yearmonth(datename)), 
-             by = c(".model", "regional_unit")) %>%
-  left_join(mutate(select(oc_monthly_quantity_gp, 
-                          c(regional_unit, datename, n)), 
-                   datename = yearmonth(datename)),
-            by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = n - .mean,
-         z_discrepancy = discrepancy/sd)  %>%
-    select(discrepancy, regional_unit, datename) %>%
+  best_model_gp_discrep  %>%
+  select(discrepancy, regional_unit, datename) %>%
   pivot_wider(names_from = datename, values_from = discrepancy) %>% 
   ungroup() %>% 
   select(-regional_unit) %>% 
-  estimate_profiles(1:8, models = c(1:3, 6)
-                    #variances = c("equal", "varying"),
-                    #covariances = c("zero", "varying")
-                    ) 
+  estimate_profiles(1:6, models = c(1:3, 6))
 
 gp_lpa_fit %>% 
   compare_solutions(statistics = c("AIC", "BIC"))
@@ -738,23 +782,17 @@ gp_lpa_fit %>%
 
 gp_lpa_fit %>%
   plot_profiles(x = ., rawdata = FALSE)
+
+
 ```
 
+#### mplus 
 
-```{r}
-best_model_gp %>% 
-  select(.model, regional_unit) %>% 
-  inner_join(mutate(oc_gp_fcsts,
-                    datename = yearmonth(datename)), 
-             by = c(".model", "regional_unit")) %>%
-  left_join(mutate(select(oc_monthly_quantity_gp, 
-                          c(regional_unit, datename, n)), 
-                   datename = yearmonth(datename)),
-            by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = (n - .mean), # Why are the numbers so small?
-         regional_unit = as.factor(regional_unit)) %>% 
+```{r, mplus-data-prep}
+best_model_gp_discrep %>% 
+  mutate(regional_unit = as.factor(regional_unit)) %>% 
   select(regional_unit, datename, discrepancy) %>% 
-  filter(!is.na(discrepancy)) %>% # need to remove NA before pivoting to enalable values_fill
+  filter(!is.na(discrepancy)) %>% # need to remove NA before pivoting to enable values_fill
   pivot_wider(names_from = datename, values_from = discrepancy, values_fill = -999) %>% 
   left_join(select(gp, c(practiceid, cluster)), by = c("regional_unit" = "practiceid")) %>% 
   mutate(regional_unit = as.factor(regional_unit),
@@ -764,26 +802,96 @@ best_model_gp %>%
   select(cluster, regional_unit, everything()) %>% 
   write_csv(file = "../data/mplus/oc_gp_discrep.csv", col_names = FALSE)
 
-
 ```
 
 
-```{r, eval=FALSE}
-source("../r_scripts/functions/mplus_plotting.R")
-mplus.view.plots("../mplus_analyses/oc_gp/oc_discrep_2_class_ml.gh5")
-mplus.plot.estimated_means("../mplus_analyses/oc_gp/oc_discrep_2_class_ml.gh5")
-mplus_models <- MplusAutomation::readModels("../mplus_analyses/oc_gp")
 
-mplus_models$oc_discrep_1_class_bayes.out$summaries$BIC
+```{r, mplus-anlayses}
+source("../r_scripts/functions/mplus_plotting.R")
+# mplus_models <- MplusAutomation::readModels("../mplus_analyses/oc_gp")
 
 mplus_model_summaries <- 
-  MplusAutomation::readModels("../mplus_analyses/oc_gp", what = "summaries", quiet = TRUE)
+  readModels("../mplus_analyses/oc_gp", what = "summaries", quiet = TRUE)
 
-mplus_model_summaries$oc_discrep_1_class_bayes.out$summaries %>% 
-  squash() %>% 
-  as_tibble()
+best_mplus_model_summary <- 
+  mplus_model_summaries %>% 
+  flatten() %>% 
+  map(2) %>% 
+  bind_rows() %>% 
+  filter(Estimator == "MLR" & AnalysisType == "mixture") %>% 
+  arrange(BIC) %>% 
+  slice(1)
 
-length(mplus_model_summaries)
-map_dfr(.x = 1:length(mplus_model_summaries), 
-        .f = ~mplus_model_summaries[[.x]]$summaries$BIC)
+best_mplus_model <- 
+  readModels(paste0("../mplus_analyses/oc_gp/", best_mplus_model_summary$Filename))
+
+oc_discrep_5_class_ml <- 
+  readModels("../mplus_analyses/oc_gp/oc_discrep_5_class_ml.out")
+
+best_mplus_model$class_counts
+
+# mplus.view.plots("../mplus_analyses/oc_gp/oc_discrep_5_class_ml.gh5")
+mplus.plot.estimated_means("../mplus_analyses/oc_gp/oc_discrep_5_class_ml.gh5")
 ```
+#### kmeans
+
+```{r, gp-kmeans}
+gp_kmeans_data <- 
+  best_model_gp_discrep %>%  
+  mutate(regional_unit = as.factor(regional_unit)) %>% 
+  select(regional_unit, datename, discrepancy) %>% 
+  filter(!is.na(discrepancy)) %>% # need to remove NA before pivoting to enable values_fill
+  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
+  as_tibble() %>% 
+  na.omit()
+
+1:6 %>% 
+  map_dfr(~as.data.frame(kmeans(x = gp_kmeans_data[2:6], centers = .x, nstart = 25)$cluster), 
+          .id = "n_clusters") %>% 
+  mutate(regional_unit = rep(gp_kmeans_data$regional_unit, 6)) %>% 
+  pivot_wider(names_from = "n_clusters", id_cols = regional_unit,
+              values_from = "kmeans(x = gp_kmeans_data[2:6], centers = .x, nstart = 25)$cluster")
+
+1:6 %>% 
+  map_dfr(~as.data.frame(kmeans(x = gp_kmeans_data[2:6],
+                                centers = .x, nstart = 25)$centers), 
+          .id = "n_clusters") %>% 
+  rownames_to_column(var = "cluster") %>% 
+  mutate(cluster = 
+           str_remove_all(cluster, 
+                          pattern = DOT %R% DOT %R% DOT %R% 
+                            one_or_more(DIGIT))) %>% 
+  pivot_longer(cols = starts_with("2020 "), names_to = "datename") %>% 
+  ggplot(aes(x = yearmonth(datename), y = value, colour = as.factor(cluster))) + 
+  geom_line() +
+  facet_wrap(~n_clusters)
+  
+
+```
+#### Comparing methods
+
+```{r}
+mplus_assignment <- 
+  read_table("../mplus_analyses/oc_gp/oc_discrep_5_class_ml_cprob.txt", col_names = FALSE, na = "*") %>% 
+  na.omit() %>% 
+  .$X17
+
+kmeans_assignment <- 
+  kmeans(x = gp_kmeans_data[2:6], centers = 5, nstart = 25)$cluster
+
+lpa_assignment <- 
+  gp_lpa_fit$model_1_class_5$model$classification
+
+df <- bind_cols(mplus_assignment, kmeans_assignment, lpa_assignment)
+
+df %>% 
+  ggplot(aes(x = mplus_assignment, y = kmeans_assignment, 
+             colour = as.factor(mplus_assignment)))+
+  geom_jitter(aes(shape = as.factor(kmeans_assignment)), alpha = .5)
+
+df %>% 
+  ggplot(aes(x = mplus_assignment, y = lpa_assignment, 
+             colour = as.factor(kmeans_assignment))) +
+  geom_jitter(alpha = .5)
+```
+
