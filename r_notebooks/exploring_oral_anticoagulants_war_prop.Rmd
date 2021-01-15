@@ -19,6 +19,8 @@ library(fable)
 library(fable.prophet)
 library(feasts)
 library(furrr)
+library(progressr)
+library(beepr)
 library(serCymruTools)
 
 ## Options
@@ -26,11 +28,31 @@ knitr::opts_chunk$set(cache = TRUE)
 options(mc.cores = parallel::detectCores() - 1)
 rstan_options(auto_write = TRUE)
 
+handlers(global = TRUE)
+handlers(
+  list(
+    handler_progress(
+      format = ":spin :current/:total (:message) [:bar] :percent in :elapsed ETA: :eta",
+      width = 60,
+      complete = "+"),
+    handler_beepr(finish   = "wilhelm",
+                  interval = 2.0)
+  )
+)
+
 ## Seed
 set.seed(32)
 
 
 ## Function
+# Transforming data to be bound beweent a lower and upper limit http://www.maths.bristol.ac.uk/R/web/packages/fable/vignettes/transformations.html
+scaled_logit <- function(x, lower=0, upper=1){
+  log((x-lower)/(upper-x))
+}
+inv_scaled_logit <- function(x, lower=0, upper=1){
+  (upper-lower)*exp(x)/(1+exp(x)) + lower
+}
+my_scaled_logit <- fabletools::new_transformation(scaled_logit, inv_scaled_logit)
 
 propRegional <- function(data, region, datename = datename, unit = Quantity, 
                          bnf){
@@ -54,68 +76,31 @@ propRegional <- function(data, region, datename = datename, unit = Quantity,
     as_tsibble(index = !!datename, key = regional_unit)
 }
 
-# Modifying functions to model log(n) as using proportion data
+# Modifying functions to model my_scaled_logit(n, 0, 100) as using proportion data
 fableModels <- function(data){
   if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
   
   data %>%
     mutate(datename = yearmonth(datename)) %>%
-    model(trend_model1 = TSLM(log(n) ~ trend()),#time series linear model
-          trend_model2 = TSLM(log(n) ~ trend() + season("year")),
-          ets1 = ETS(log(n) ~ trend()),
-          ets2 = ETS(log(n) ~ trend() + season("A")),
-          ets3 = ETS(log(n) ~ trend() + season("M")),
-          arima = ARIMA(log(n), stepwise = FALSE, approximation = FALSE),
-          comb1 = combination_model(TSLM(log(n) ~ trend()),
-                                    ETS(log(n) ~ trend())),
-          comb2 = combination_model(TSLM(log(n) ~ trend() + season("year")),
-                                    ETS(log(n) ~ trend() + season("A"))),
-          stl_dcmp1 = decomposition_model(STL(log(n) ~ trend(),
+    model(trend_model1 = TSLM(my_scaled_logit(n, 0, 100) ~ trend()),#time series linear model
+          trend_model2 = TSLM(my_scaled_logit(n, 0, 100) ~ trend() + season("year")),
+          ets1 = ETS(my_scaled_logit(n, 0, 100) ~ trend()),
+          ets2 = ETS(my_scaled_logit(n, 0, 100) ~ trend() + season("A")),
+          ets3 = ETS(my_scaled_logit(n, 0, 100) ~ trend() + season("M"), restrict = FALSE),
+          arima = ARIMA(my_scaled_logit(n, 0, 100), stepwise = FALSE, approximation = FALSE),
+          comb1 = combination_model(TSLM(my_scaled_logit(n, 0, 100) ~ trend()),
+                                    ETS(my_scaled_logit(n, 0, 100) ~ trend())),
+          comb2 = combination_model(TSLM(my_scaled_logit(n, 0, 100) ~ trend() + season("year")),
+                                    ETS(my_scaled_logit(n, 0, 100) ~ trend() + season("A"))),
+          stl_dcmp1 = decomposition_model(STL(my_scaled_logit(n, 0, 100) ~ trend(),
                                               iterations = 1000,
                                               robust = TRUE),
                                           SNAIVE(season_adjust)),
-          stl_dcmp2 = decomposition_model(STL(log(n) ~ trend() + season(),
+          stl_dcmp2 = decomposition_model(STL(my_scaled_logit(n, 0, 100) ~ trend() + season(),
                                               iterations = 1000,
                                               robust = TRUE),
                                           SNAIVE(season_adjust)),
-          s_naive = SNAIVE(log(n)))
-}
-
-prophetModels <- function(data){
-  if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
-  
-  oc_prophet_model1 <-
-    fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
-                             season("year", type = "additive") +
-                             holiday(holidays))
-  oc_prophet_model2 <-
-    fable.prophet::prophet(log(n) ~ growth("linear", n_changepoints = 0) +
-                             season("year", type = "multiplicative") +
-                             holiday(holidays))
-  oc_prophet_model3 <-
-    fable.prophet::prophet(log(n) ~ growth("linear") +
-                             season("year", type = "additive") +
-                             holiday(holidays))
-  oc_prophet_model4 <-
-    fable.prophet::prophet(log(n) ~ growth("linear") +
-                             season("year", type = "multiplicative") +
-                             holiday(holidays))
-  oc_prophet_model5 <-
-    fable.prophet::prophet(log(n) ~ season("year", type = "additive") +
-                             holiday(holidays))
-  oc_prophet_model6 <-
-    fable.prophet::prophet(log(n) ~ season("year", type = "multiplicative") +
-                             holiday(holidays))
-  oc_prophet_model7 <-
-    fable.prophet::prophet(log(n) ~ holiday(holidays))
-  oc_prophet_model8 <-
-    fable.prophet::prophet(log(n))
-  
-  data %>%
-    mutate(datename = yearmonth(datename)) %>%
-    model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3,
-          oc_prophet_model4, oc_prophet_model5, oc_prophet_model6,
-          oc_prophet_model7, oc_prophet_model8, .safely = TRUE)
+          s_naive = SNAIVE(my_scaled_logit(n, 0, 100)))
 }
 
 holidays <-
@@ -130,18 +115,59 @@ holidays <-
                                   "2019-04-21", "2020-04-12", "2021-04-04")),
                    lower_window = -2,
                    upper_window = 1))
+
+prophetModels <- function(data){
+  if(!is_tsibble(data)){data <- as_tsibble(data, index = datename)}
+  
+  oc_prophet_model1 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ growth("linear", n_changepoints = 0) +
+                             season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model2 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ growth("linear", n_changepoints = 0) +
+                             season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model3 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ growth("linear") +
+                             season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model4 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ growth("linear") +
+                             season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model5 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ season("year", type = "additive") +
+                             holiday(holidays))
+  oc_prophet_model6 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ season("year", type = "multiplicative") +
+                             holiday(holidays))
+  oc_prophet_model7 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100) ~ holiday(holidays))
+  oc_prophet_model8 <-
+    fable.prophet::prophet(my_scaled_logit(n, 0, 100))
+  
+  data %>%
+    mutate(datename = yearmonth(datename)) %>%
+    model(oc_prophet_model1, oc_prophet_model2, oc_prophet_model3,
+          oc_prophet_model4, oc_prophet_model5, oc_prophet_model6,
+          oc_prophet_model7, oc_prophet_model8, .safely = TRUE)
+}
+
 regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
   
   # CV accuracy for fableModels() and prophetModels()
   
   regions <- unique(data$regional_unit) # Get unique regional_units for map()
   
+  p <- progressr::progressor(along = regions)
 
   fableCV <- function(data){ # Return CV model accuracy for fableModels()
+    x <- data$regional_unit
+
     data_test <-
       data %>%
       mutate(datename = yearmonth(datename))
-    
+
     data_tr <-
       data %>%
       select(regional_unit, datename, n) %>%
@@ -154,35 +180,33 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
       fableModels() %>%
       forecast(h = cv_dist) %>%
       accuracy(data_test)
+
+    p()
   }
   
   prophetCV <- function(data){# Return CV model accuracy for prophetModels()
+    x <- data$regional_unit
+
     data_test <-
       data %>%
       mutate(datename = yearmonth(datename))
-    
-    data_tr <-
+
+    data_trn <-
       data %>%
       select(regional_unit, datename, n) %>%
       mutate(datename = yearmonth(datename)) %>%
       fill_gaps() %>%
       slice(1:(n()-cv_dist), .preserve = TRUE) %>%
       stretch_tsibble(.init = init, .step = step)
-    
-    data_tr %>%
+      
+    data_trn %>% 
       prophetModels() %>%
       forecast(h = cv_dist) %>%
       accuracy(data_test)
+
+    p()
   }
-  
-  plan(cluster, 8) # Set up parallel processing to decrease computation time
-  #plan(multisession) # Set up parallel processing to decrease computation time
-  # Prophet models won't run with plan(multisession) so need to be run
-  # sequentially. Is it worth trying to write this in Python and pass it back
-  # to R?
-  
-  # Probably worth trying the prophet::cross_validation() method. If it
-  # returns RMSE and is faster it will be useful.
+
   prophet_fits <-
     future_map_dfr(.x =  regions,
                    .f = ~prophetCV(data = filter(data, regional_unit == .x)),
@@ -196,7 +220,6 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
     future_map_dfr(.x =  regions,
                    .f = ~fableCV(data = filter(data, regional_unit == .x)),
                    .options = furrr_options(seed = TRUE))
-  plan(sequential) # Close the multiprocess function to prevent memory leakage
   message("fableModels() complete")
   
   bind_rows(fable_fits, prophet_fits) %>%
@@ -206,35 +229,25 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
 
 regionalJointFcsts <- function(data, h ="5 months"){
   regions <- unique(data$regional_unit)
-  plan(cluster)
+
   fable_fit <-
     future_map_dfr(.x = regions,
-                   .f = ~fableModels(filter(data, regional_unit ==.x)),
-                   .options = furrr_options(seed = TRUE))
-  message("fable fits complete")
-
-  fable_fcst <- fable_fit %>%
-    forecast(h = h) %>%
+                   .f = ~fableModels(filter(data, regional_unit ==.x)) %>%
+                    forecast(h = h),
+                   .options = furrr_options(seed = TRUE)) %>%
     as_tibble()
+  
   message("fable forecasts complete")
 
 
   prophet_fit <-
     future_map_dfr(.x = regions,
-                   .f = ~prophetModels(filter(data, regional_unit ==.x)),
-                   .options = furrr_options(seed = TRUE))
-  message("prophet fits complete")
-
-  prophet_fcst <-
-    forecast(prophet_fit, h = h) %>%
+                   .f = ~prophetModels(filter(data, regional_unit ==.x)) %>%
+                    forecast(h = h),
+                   .options = furrr_options(seed = TRUE)) %>%
     as_tibble()
-  # Some prophet forecasts are giving daily forecasts. We want monthly forecasts.
-  # This may also be influencing accuracy
 
   message("prophet forecasts complete")
-  plan(sequential)
-  # prophetModels now being run in parallel. Needed to reinstall prophet from
-  # source
 
   # joint_fit <-
   #   left_join(fable_fit, prophet_fit, by = "regional_unit")
@@ -570,18 +583,20 @@ complete_oac_p_monthly_quantity_gp_pre_cv19_4 <-
   filter(regional_unit %in% seg_4)
 
 # Running regionalCV() on each of the quarter of the data
+plan(cluster)
 system.time(oac_p_gp_cv_models_1 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_1 %>%
               regionalCV())
-system.time(oac_p_gp_cv_models_2 <-
+with_progress(system.time(oac_p_gp_cv_models_2 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_2 %>%
-              regionalCV())
+              regionalCV()))
 system.time(oac_p_gp_cv_models_3 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_3 %>%
               regionalCV())
 system.time(oac_p_gp_cv_models_4 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_4 %>%
               regionalCV())
+plan(sequential)
 
 # Joining the separated results
 oac_p_gp_cv_models <- 
@@ -591,7 +606,7 @@ oac_p_gp_cv_models <-
         oac_p_gp_cv_models_4)
 
 oac_p_gp_cv_models %>%
-  write_rds("../data/oac_p_gp_cv_models.rds")
+  saveRDS("../data/oac_p_gp_cv_models.rds")
 
 oac_p_gp_cv_models <- 
   read_rds("../data/oac_p_gp_cv_models.rds")
@@ -624,59 +639,59 @@ oac_p_gp_cv_models %>%
 
 
 ```{r}
-# regionalJointFcsts <- function (data, h = "5 months", keep_fits = FALSE) 
-# {
-#   if (!is.logical(keep_fits)) {
-#     stop("`keep_fits` must be of type logical")
-#   }
-#   regions <- unique(data$regional_unit)
-#   
-#   cl <- parallel::makeCluster(8)
-#   plan(cluster, workers = cl)
-#   
-#   fable_fcst <- 
-#     future_map_dfr(.x = regions, 
-#                    .f = ~fableModels(filter(data, 
-#                                             regional_unit == .x)) %>% 
-#                      forecast(h = h) %>% as_tibble(), 
-#                    .options = furrr_options(seed = TRUE))
-#   
-#   
-#   message("fable fits complete, step 1/4")
-#   message("fable forecasts complete, step 2/4")
-# 
-#   prophet_fcst <- 
-#     future_map_dfr(.x = regions, 
-#                    .f = ~prophetModels(filter(data, 
-#                                             regional_unit == .x)) %>% 
-#                      forecast(h = h) %>% as_tibble(), 
-#                    .options = furrr_options(seed = TRUE))
-#   message("prophet fits complete, step 3/4")
-#   message("prophet forecasts complete, step 4/4")
-#   
-#   parallel::stopCluster(cl)
-#   plan(sequential)
-#   joint_fcst <- dplyr::bind_rows(fable_fcst, prophet_fcst) %>% 
-#     dplyr::mutate(lb_95 = quantile(n, 0.025), lb_80 = quantile(n, 
-#       0.1), med = median(n), ub_80 = quantile(n, 0.9), 
-#       ub_95 = quantile(n, 0.975), sd = distributional::variance(n)^2, 
-#       dist = n, n = NULL)
-#       return(list(forecasts = joint_fcst))
-# }
-
+plan(cluster, workers = 8)
 system.time(oac_p_gp_fcsts <-
               oac_p_monthly_quantity_gp_pre_cv19 %>%
               filter(!regional_unit %in% incomplete_gp) %>%
               regionalJointFcsts())
+plan(sequential)
 
 oac_p_gp_fcsts %>%
-  write_rds("../data/oac_p_gp_fcsts.rds")
+  saveRDS("../data/oac_p_gp_fcsts.rds")
 
 oac_p_gp_fcsts <- 
   read_rds("../data/oac_p_gp_fcsts.rds")
 ```
 
 * 2020-12-18 2694 secs
+
+```{r}
+oac_p_monthly_quantity_gp_pre_cv19_complete <-
+  oac_p_monthly_quantity_gp_pre_cv19 %>% 
+  filter(!regional_unit %in% incomplete_gp)
+
+plan(cluster, workers = 8)
+system.time(fable_fit <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit,
+                 .f = ~fableModels(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                          regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+
+system.time(prophet_fit <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit,
+                 .f = ~prophetModels(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                            regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+plan(sequential)
+
+joint_fcst <-
+  bind_rows(fable_fcst, prophet_fcst) %>%
+  mutate(lb_95 = quantile(n, .025),
+         lb_80 = quantile(n, .1),
+         med = median(n),
+         ub_80 = quantile(n, .9),
+         ub_95 = quantile(n, .975),
+         sd = distributional::variance(n)^2,
+         dist = n,
+         n = NULL)
+joint_fcst %>%
+  saveRDS("../data/oac_p_gp_fcsts.rds")
+
+```
 
 ## Discrepancies
 
