@@ -333,7 +333,17 @@ oac_p_monthly_quantity_cluster <-
   propRegional(cluster, datename, Quantity, bnf = warf)
 
 oac_p_monthly_quantity_gp <- 
-  propRegional(oac, PracticeID, datename, Quantity, bnf = warf)
+  oac %>% 
+  group_by(PracticeID, datename, bnfchem) %>% 
+  summarise(sum_n = sum(Quantity), .groups = "drop_last") %>% 
+  mutate(p_war = 100 * sum_n / sum(sum_n)) %>% 
+  filter(bnfchem == as_name(warf)) %>% 
+  transmute(regional_unit = as.factor(PracticeID),
+            datename = datename,
+            n = p_war) %>%
+    ungroup() %>%
+    as_tsibble(index = datename, key = regional_unit)
+  
   
 
 ## Sort into monthly count data pre-lockdown (2020-03-23)
@@ -341,13 +351,13 @@ oac_p_monthly_count_pre_cv19 <-
   oac_p_monthly_count %>% 
   filter(datename < dmy("01-03-2020"))
 
-oac_p_monthly_quantity_hb_pre_cv19 <- 
-  oac_p_monthly_quantity_hb %>% 
-    filter(datename < dmy("01-03-2020"))
-
-oac_p_monthly_quantity_cluster_pre_cv19 <- 
-  oac_p_monthly_quantity_cluster %>% 
-    filter(datename < dmy("01-03-2020"))
+# oac_p_monthly_quantity_hb_pre_cv19 <- 
+#   oac_p_monthly_quantity_hb %>% 
+#     filter(datename < dmy("01-03-2020"))
+# 
+# oac_p_monthly_quantity_cluster_pre_cv19 <- 
+#   oac_p_monthly_quantity_cluster %>% 
+#     filter(datename < dmy("01-03-2020"))
 
 oac_p_monthly_quantity_gp_pre_cv19 <- 
   oac_p_monthly_quantity_gp %>% 
@@ -436,7 +446,7 @@ oac_p_monthly_count_pre_cv19$n %>%
 
 ### By Health Board
 
-```{r, health-board-modelling}
+```{r, health-board-modelling, eval = FALSE}
 plan(cluster)
 system.time(oac_p_hb_cv_models <-
   regionalCV(data = oac_p_monthly_quantity_hb_pre_cv19))
@@ -471,7 +481,7 @@ oac_p_hb_cv_models %>%
 
 * 965.17 seconds with prophetModelsBound() 2021-01-15
 
-```{r}
+```{r health-board-forecast, eval = FALSE}
 plan(cluster)
 system.time(oac_p_hb_fcsts <- regionalJointFcsts(oac_p_monthly_quantity_hb_pre_cv19))
 plan(sequential)
@@ -487,7 +497,7 @@ oac_p_hb_fcsts <-
 
 ### By GP Cluster
 
-```{r, gp-cluster-modelling}
+```{r, gp-cluster-modelling, eval = FALSE}
 plan(cluster)
 system.time(oac_p_gp_cluster_cv_models <-
   regionalCV(data = oac_p_monthly_quantity_cluster_pre_cv19))
@@ -525,7 +535,7 @@ oac_p_gp_cluster_cv_models %>%
 
 * 
 
-```{r}
+```{r gp-cluste-forecast, eval = FALSE}
 plan(cluster)
 system.time(oac_p_gp_cluster_fcsts <- 
               regionalJointFcsts(oac_p_monthly_quantity_cluster_pre_cv19))
@@ -546,12 +556,13 @@ oac_p_gp_cluster_fcsts <-
 ```{r, gp-practice-modelling}
 incomplete_gp <- # Need to remove GP Practices with incomplete data
   oac_p_monthly_quantity_gp_pre_cv19 %>% 
-    as_tibble() %>% 
-    group_by(regional_unit) %>% 
-    count() %>% 
-    filter(n < 50) %>% 
-    .$regional_unit %>% 
-    unique()
+  as_tibble() %>% 
+  group_by(regional_unit) %>% 
+  count() %>% 
+  filter(n < 50) %>% 
+  .$regional_unit %>% 
+  as.character() %>% 
+  unique()
 
 complete_oac_p_monthly_quantity_gp_pre_cv19 <- 
   oac_p_monthly_quantity_gp_pre_cv19 %>% 
@@ -593,13 +604,13 @@ complete_oac_p_monthly_quantity_gp_pre_cv19_4 <-
   filter(regional_unit %in% seg_4)
 
 # Running regionalCV() on each of the quarter of the data
-plan(cluster)
+plan(multisession)
 system.time(oac_p_gp_cv_models_1 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_1 %>%
               regionalCV())
-with_progress(system.time(oac_p_gp_cv_models_2 <-
+system.time(oac_p_gp_cv_models_2 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_2 %>%
-              regionalCV()))
+              regionalCV())
 system.time(oac_p_gp_cv_models_3 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_3 %>%
               regionalCV())
@@ -662,13 +673,31 @@ fableModelsBound() complete
   370.35    21.11 11321.84 
 
 
-```{r}
-plan(cluster, workers = 8)
-system.time(oac_p_gp_fcsts <-
-              oac_p_monthly_quantity_gp_pre_cv19 %>%
-              filter(!regional_unit %in% incomplete_gp) %>%
-              regionalJointFcsts())
+```{r gp-practice-forecast}
+plan(multisession)
+system.time(oac_p_gp_fcst_1 <-
+  oac_p_monthly_quantity_gp_pre_cv19 %>%
+              filter(regional_unit %in% seg_1) %>%
+    regionalJointFcsts())
+system.time(oac_p_gp_fcst_2 <-
+  oac_p_monthly_quantity_gp_pre_cv19 %>%
+              filter(regional_unit %in% seg_2) %>%
+    regionalJointFcsts())
+system.time(oac_p_gp_fcst_3 <-
+  oac_p_monthly_quantity_gp_pre_cv19 %>%
+              filter(regional_unit %in% seg_3) %>%
+    regionalJointFcsts())
+system.time(oac_p_gp_fcst_4 <-
+  oac_p_monthly_quantity_gp_pre_cv19 %>%
+              filter(regional_unit %in% seg_4) %>%
+    regionalJointFcsts())
 plan(sequential)
+
+oac_p_gp_fcsts <-
+  bind_rows(oac_p_gp_fcst_1,
+            oac_p_gp_fcst_2,
+            oac_p_gp_fcst_3,
+            oac_p_gp_fcst_4)
 
 oac_p_gp_fcsts %>%
   saveRDS("../data/oac_p_gp_fcsts.rds")
@@ -677,24 +706,84 @@ oac_p_gp_fcsts <-
   read_rds("../data/oac_p_gp_fcsts.rds")
 ```
 
-* 2020-12-18 2694 secs
+* NaNs producedNaNs producedfable forecasts complete
+prophet forecasts complete
+    user   system  elapsed 
+  97.430   22.773 1580.689 
+fable forecasts complete
+prophet forecasts complete
+    user   system  elapsed 
+ 106.565   84.755 1719.863 
+fable forecasts complete
+prophet forecasts complete
+    user   system  elapsed 
+ 114.419  116.874 1867.420 
+fable forecasts complete
+prophet forecasts complete
+    user   system  elapsed 
+ 113.032  124.767 1910.564 
 
 ```{r}
 oac_p_monthly_quantity_gp_pre_cv19_complete <-
   oac_p_monthly_quantity_gp_pre_cv19 %>% 
   filter(!regional_unit %in% incomplete_gp)
 
-plan(cluster, workers = 8)
-system.time(fable_fit <-
-  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit,
+plan(multisession)
+system.time(fable_fit_1 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[1:101],
                  .f = ~fableModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
                                           regional_unit ==.x)),
                  .options = furrr_options(seed = TRUE)) %>%
   forecast(h = "5 months") %>%
   as_tibble())
 
-system.time(prophet_fit <-
-  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit,
+system.time(prophet_fit_1 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[1:101],
+                 .f = ~prophetModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                            regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+system.time(fable_fit_2 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[102:202],
+                 .f = ~fableModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                          regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+
+system.time(prophet_fit_2 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[102:202],
+                 .f = ~prophetModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                            regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+system.time(fable_fit_3 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[203:303],
+                 .f = ~fableModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                          regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+
+system.time(prophet_fit_3 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[203:303],
+                 .f = ~prophetModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                            regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+system.time(fable_fit_4 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[304:404],
+                 .f = ~fableModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
+                                          regional_unit ==.x)),
+                 .options = furrr_options(seed = TRUE)) %>%
+  forecast(h = "5 months") %>%
+  as_tibble())
+
+system.time(prophet_fit_4 <-
+  future_map_dfr(.x = oac_p_monthly_quantity_gp_pre_cv19_complete$regional_unit[304:404],
                  .f = ~prophetModelsBound(filter(oac_p_monthly_quantity_gp_pre_cv19_complete,
                                             regional_unit ==.x)),
                  .options = furrr_options(seed = TRUE)) %>%
@@ -703,7 +792,10 @@ system.time(prophet_fit <-
 plan(sequential)
 
 joint_fcst <-
-  bind_rows(fable_fcst, prophet_fcst) %>%
+  bind_rows(fable_fcst_1, prophet_fcst_1,
+            fable_fcst_2, prophet_fcst_2,
+            fable_fcst_3, prophet_fcst_3,
+            fable_fcst_4, prophet_fcst_4) %>%
   mutate(lb_95 = quantile(n, .025),
          lb_80 = quantile(n, .1),
          med = median(n),
@@ -829,12 +921,10 @@ best_model_gp %>%
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
 
-
 ```
 
 
-
-```{r, eval = FALSE}
+```{r}
 best_model_gp %>% 
   select(.model, regional_unit) %>% 
   inner_join(mutate(oac_p_gp_fcsts,
@@ -844,18 +934,18 @@ best_model_gp %>%
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = 1000000*(n - .mean), # Why are the numbers so small?
-         regional_unit = as.factor(regional_unit)) %>% 
-  select(regional_unit, datename, discrepancy) %>% 
-  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
-  mutate(regional_unit = as.numeric(regional_unit)) %>% 
-  na.omit() %>% .[2:5] %>% min()
-  write_csv(file = "../data/mplus/oac_gp_discrep.csv", col_names = FALSE)
+  mutate(discrepancy = n - .mean,
+         # regional_unit = as.character(regional_unit)
+         ) %>% 
+  ggplot(aes(x = datename, y = n, group = regional_unit)) +
+  geom_line() +
+  facet_wrap(~regional_unit)
+  
+  as_tsibble(key = regional_unit, index = datename) %>% 
+  autoplot(oac_p_monthly_quantity_gp_pre_cv19 %>% 
+             select(regional_unit, datename, n) %>% 
+             as_tsibble(key = regional_unit, index = datename)) +
+  theme(legend.position = "none")
 ```
 
-```{r, eval = FALSE}
-source("../r_scripts/functions/mplus_plotting.R")
-mplus.view.plots("../mplus_analyses/oac_discrep_3_class_bayes.gh5")
-mplus.plot.estimated_means("../mplus_analyses/oac_discrep_3_class_bayes.gh5")
-```
 
