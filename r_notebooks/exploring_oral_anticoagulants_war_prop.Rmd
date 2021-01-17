@@ -223,7 +223,7 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
                    .options = furrr_options(seed = TRUE))
   message("prophetModelsBound() complete")
   
-  # Fable models will run using plan(multisession), but need to be run as below
+  # Fable models will run using plan(cluster), but need to be run as below
   # with `furrr_options(seed = TRUE)` otherwise improper random numbers are
   # generated
   fable_fits <-
@@ -240,7 +240,7 @@ regionalCV <- function(data, cv_dist = 6, init = 36, step = 1){
 regionalJointFcsts <- function(data, h ="5 months"){
   regions <- unique(data$regional_unit)
 
-  fable_fit <-
+  fable_fcst <-
     future_map_dfr(.x = regions,
                    .f = ~fableModelsBound(filter(data, regional_unit ==.x)) %>%
                     forecast(h = h),
@@ -250,7 +250,7 @@ regionalJointFcsts <- function(data, h ="5 months"){
   message("fable forecasts complete")
 
 
-  prophet_fit <-
+  prophet_fcst <-
     future_map_dfr(.x = regions,
                    .f = ~prophetModelsBound(filter(data, regional_unit ==.x)) %>%
                     forecast(h = h),
@@ -437,7 +437,7 @@ oac_p_monthly_count_pre_cv19$n %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-plan(multisession)
+plan(cluster)
 system.time(oac_p_hb_cv_models <-
   regionalCV(data = oac_p_monthly_quantity_hb_pre_cv19))
 plan(sequential)
@@ -469,8 +469,7 @@ oac_p_hb_cv_models %>%
   theme(axis.text.x = element_text(angle = 90))
 ```
 
-* 724.044 seconds with multisession prophetModelsBound()
-* 418.410 seconds with neur_net removed 2021-01-11
+* 965.17 seconds with prophetModelsBound() 2021-01-15
 
 ```{r}
 plan(cluster)
@@ -482,15 +481,14 @@ oac_p_hb_fcsts %>%
 oac_p_hb_fcsts <- 
   read_rds("../data/oac_p_hb_fcsts.rds")
 ```
-
-* 194.071 seconds 2020-12-10
-* 71.559 seconds 2021-01-11
+129.80 2021-01-15
+* 
 
 
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
-plan(multisession)
+plan(cluster)
 system.time(oac_p_gp_cluster_cv_models <-
   regionalCV(data = oac_p_monthly_quantity_cluster_pre_cv19))
 plan(sequential)
@@ -525,8 +523,7 @@ oac_p_gp_cluster_cv_models %>%
 
 ```
 
-* 5514.279 seconds
-* 2059.159 seconds 2021-01-11
+* 
 
 ```{r}
 plan(cluster)
@@ -647,8 +644,22 @@ oac_p_gp_cv_models %>%
 ```
 
 
-* 2.195e+04 seconds 2020-12-07
-* 25547.266 seconds 2020-12-09
+* prophetModelsBound() complete
+NaNs producedfableModelsBound() complete
+    user   system  elapsed 
+  504.83    38.03 11465.09 
+prophetModelsBound() complete                                         
+NaNs producedNaNs producedfableModelsBound() complete                 
+    user   system  elapsed 
+  520.35    40.97 11534.13 
+prophetModelsBound() complete
+fableModelsBound() complete
+    user   system  elapsed 
+  377.34    22.89 11300.13 
+prophetModelsBound() complete
+fableModelsBound() complete
+    user   system  elapsed 
+  370.35    21.11 11321.84 
 
 
 ```{r}
@@ -703,6 +714,9 @@ joint_fcst <-
          n = NULL)
 joint_fcst %>%
   saveRDS("../data/oac_p_gp_fcsts.rds")
+
+oac_p_gp_fcsts <-
+  read_rds("../data/oac_p_gp_fcsts.rds")
 
 ```
 
