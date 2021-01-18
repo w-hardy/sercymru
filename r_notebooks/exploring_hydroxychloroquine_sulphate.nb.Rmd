@@ -134,7 +134,7 @@ hcq_monthly_quantity_gp_pre_cv19 <-
 
 ### 2016-2020 plot of all hcq prescriptions 
 
-```{r hcq-monthly-ts-plot, fig.cap="Total quantity of combined hormonal and progestogen only oral contraceptives prescribed per month."}
+```{r hcq-monthly-ts-plot, fig.cap="Total quantity of hcq prescribed per month."}
 hcq %>% 
   group_by(datename) %>% 
   summarise(n = sum(Quantity)) %>% 
@@ -391,34 +391,34 @@ complete_gp <-
   unique()
 
 
-# plan(multisession)
-# # Chunking analyses into ~100 GPs uses ~ 23Gb of RAM
-# system.time(hcq_gp_cv_models_1 <-
-#   hcq_monthly_quantity_gp_pre_cv19 %>%
-#     filter(regional_unit %in% complete_gp[1:100]) %>% 
-#               regionalCV(init = 48))
-# system.time(hcq_gp_cv_models_2 <-
-#   hcq_monthly_quantity_gp_pre_cv19 %>%
-#     filter(regional_unit %in% complete_gp[101:200]) %>% 
-#               regionalCV(init = 48))
-# system.time(hcq_gp_cv_models_3 <-
-#   hcq_monthly_quantity_gp_pre_cv19 %>%
-#     filter(regional_unit %in% complete_gp[201:300]) %>% 
-#               regionalCV(init = 48))
-# system.time(hcq_gp_cv_models_4 <-
-#   hcq_monthly_quantity_gp_pre_cv19 %>%
-#     filter(regional_unit %in% complete_gp[301:length(complete_gp)]) %>% 
-#               regionalCV(init = 48))
-# plan(sequential)
-# 
-# hcq_gp_cv_models <- 
-#   bind_rows(hcq_gp_cv_models_1,
-#             hcq_gp_cv_models_2,
-#             hcq_gp_cv_models_3,
-#             hcq_gp_cv_models_4)
-# 
-# hcq_gp_cv_models %>%
-#   saveRDS("../data/hcq_gp_cv_models.rds")
+plan(cluster)
+# Chunking analyses into ~100 GPs uses ~ 23Gb of RAM
+system.time(hcq_gp_cv_models_1 <-
+  hcq_monthly_quantity_gp_pre_cv19 %>%
+    filter(regional_unit %in% complete_gp[1:100]) %>%
+              regionalCV(init = 48))
+system.time(hcq_gp_cv_models_2 <-
+  hcq_monthly_quantity_gp_pre_cv19 %>%
+    filter(regional_unit %in% complete_gp[101:200]) %>%
+              regionalCV(init = 48))
+system.time(hcq_gp_cv_models_3 <-
+  hcq_monthly_quantity_gp_pre_cv19 %>%
+    filter(regional_unit %in% complete_gp[201:300]) %>%
+              regionalCV(init = 48))
+system.time(hcq_gp_cv_models_4 <-
+  hcq_monthly_quantity_gp_pre_cv19 %>%
+    filter(regional_unit %in% complete_gp[301:length(complete_gp)]) %>%
+              regionalCV(init = 48))
+plan(sequential)
+
+hcq_gp_cv_models <-
+  bind_rows(hcq_gp_cv_models_1,
+            hcq_gp_cv_models_2,
+            hcq_gp_cv_models_3,
+            hcq_gp_cv_models_4)
+
+hcq_gp_cv_models %>%
+  saveRDS("../data/hcq_gp_cv_models.rds")
 
 hcq_gp_cv_models <- 
   read_rds("../data/hcq_gp_cv_models.rds")
