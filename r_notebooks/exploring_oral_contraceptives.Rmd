@@ -424,16 +424,16 @@ augment(fit) %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-# plan(multisession)
-# system.time(oc_hb_cv_models <-
-#   regionalCV(data = oc_monthly_quantity_hb_pre_cv19))
-# plan(sequential)
-# 
+plan(multisession)
+system.time(oc_hb_cv_models <-
+  regionalCV(data = oc_monthly_quantity_hb_pre_cv19))
+plan(sequential)
+
 # oc_hb_cv_models %>%
 #   saveRDS("../data/oc_hb_cv_models.rds")
-
-oc_hb_cv_models <- 
-  read_rds("../data/oc_hb_cv_models.rds")
+# 
+# oc_hb_cv_models <- 
+#   read_rds("../data/oc_hb_cv_models.rds")
 
 oc_hb_cv_models %>% 
   group_by(regional_unit) %>% 
@@ -458,6 +458,7 @@ oc_hb_cv_models %>%
 ```
 
 * 570.350 seconds with multisession prophetModels()
+* 278.968 seconds 2021-01-18
 
 ```{r}
 # plan(multisession)
@@ -477,10 +478,10 @@ oc_hb_fcsts <-
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
-# plan(multisession)
-# system.time(oc_gp_cluster_cv_models <-
-#   regionalCV(data = oc_monthly_quantity_cluster_pre_cv19))
-# plan(sequential)
+plan(multisession)
+system.time(oc_gp_cluster_cv_models <-
+  regionalCV(data = oc_monthly_quantity_cluster_pre_cv19))
+plan(sequential)
 # 
 # oc_gp_cluster_cv_models %>%
 #   saveRDS("../data/oc_gp_cluster_cv_models.rds")
@@ -559,7 +560,8 @@ oc_gp_cv_models %>%
   arrange(RMSE, MAE) %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
-  geom_histogram()
+  geom_histogram() +
+  coord_cartesian(ylim = c(0,100))
 
 oc_gp_cv_models %>% 
   group_by(regional_unit) %>% 

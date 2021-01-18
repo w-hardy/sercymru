@@ -57,18 +57,17 @@ propRegional <- function(data, region, datename = datename, unit = Quantity,
   # Function to create tsibble object for a proportion of a drug by a given `unit` 
   # per `datename`
   # e.g. propRegional(oc, Locality, datename, Quantity) is the `Quantity`
-  # per `datename` grouped by `Locality` from `oc`. `Quantity` is corrected for
-  # the number of days in each month.
+  # per `datename` grouped by `Locality` from `oc`
+  
   region <- enquo(region)
   datename <- enquo(datename)
   unit <- enquo(unit)
   
   data %>%
     mutate(regional_unit = as_factor(set_names(!!region))) %>%
-    group_by(!!datename, bnfchem, regional_unit) %>% 
-    summarise(n = sum(!!unit)) %>% 
-    mutate(n = 100 * n / sum(n),
-           log_n = log(n)) %>% 
+    group_by(regional_unit, !!datename, bnfchem) %>% 
+    summarise(n = sum(!!unit), .groups = "drop_last") %>% 
+    mutate(n = 100 * n / sum(n)) %>% 
     filter(bnfchem == bnf) %>%
     ungroup() %>%
     as_tsibble(index = !!datename, key = regional_unit)
@@ -269,8 +268,8 @@ regionalJointFcsts <- function(data, h ="5 months"){
            ub_80 = quantile(n, .9),
            ub_95 = quantile(n, .975),
            sd = distributional::variance(n)^2,
-           dist = n,
-           n = NULL)
+           n = NULL # Remove distribution from saved object
+           )
 
   return(joint_fcst)
 }
@@ -351,13 +350,13 @@ oac_p_monthly_count_pre_cv19 <-
   oac_p_monthly_count %>% 
   filter(datename < dmy("01-03-2020"))
 
-# oac_p_monthly_quantity_hb_pre_cv19 <- 
-#   oac_p_monthly_quantity_hb %>% 
-#     filter(datename < dmy("01-03-2020"))
-# 
-# oac_p_monthly_quantity_cluster_pre_cv19 <- 
-#   oac_p_monthly_quantity_cluster %>% 
-#     filter(datename < dmy("01-03-2020"))
+oac_p_monthly_quantity_hb_pre_cv19 <-
+  oac_p_monthly_quantity_hb %>%
+    filter(datename < dmy("01-03-2020"))
+
+oac_p_monthly_quantity_cluster_pre_cv19 <-
+  oac_p_monthly_quantity_cluster %>%
+    filter(datename < dmy("01-03-2020"))
 
 oac_p_monthly_quantity_gp_pre_cv19 <- 
   oac_p_monthly_quantity_gp %>% 
@@ -480,6 +479,7 @@ oac_p_hb_cv_models %>%
 ```
 
 * 965.17 seconds with prophetModelsBound() 2021-01-15
+* 966.923 seconds with prophetModelsBound() 2021-01-18
 
 ```{r health-board-forecast, eval = FALSE}
 plan(cluster)
@@ -491,8 +491,9 @@ oac_p_hb_fcsts %>%
 oac_p_hb_fcsts <- 
   read_rds("../data/oac_p_hb_fcsts.rds")
 ```
-129.80 2021-01-15
-* 
+
+* 129.80 2021-01-15
+* 107.254 2021-01-18
 
 
 ### By GP Cluster
@@ -604,13 +605,14 @@ complete_oac_p_monthly_quantity_gp_pre_cv19_4 <-
   filter(regional_unit %in% seg_4)
 
 # Running regionalCV() on each of the quarter of the data
-plan(multisession)
+plan(cluster)
 system.time(oac_p_gp_cv_models_1 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_1 %>%
               regionalCV())
 system.time(oac_p_gp_cv_models_2 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_2 %>%
               regionalCV())
+plan(sequential)
 system.time(oac_p_gp_cv_models_3 <-
   complete_oac_p_monthly_quantity_gp_pre_cv19_3 %>%
               regionalCV())

@@ -23,11 +23,26 @@ library(rebus)
 library(MplusAutomation)
 library(tidyLPA)
 library(serCymruTools)
+library(progressr)
+library(beepr)
+
+# handlers(global = TRUE)
+# handlers(
+#   list(
+#     handler_progress(
+#       format = ":spin :current/:total (:message) [:bar] :percent in :elapsed ETA: :eta",
+#       width = 60,
+#       complete = "+"),
+#     handler_beepr(finish   = "wilhelm",
+#                   interval = 2.0)
+#   )
+# )
 
 ## Options
 knitr::opts_chunk$set(cache = TRUE)
 options(mc.cores = parallel::detectCores() - 1)
 rstan_options(auto_write = TRUE)
+
 
 ## Seed
 set.seed(32)
@@ -257,13 +272,13 @@ hcq_monthly_count %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-plan(multisession)
-system.time(hcq_hb_cv_models <-
-  regionalCV(data = hcq_monthly_quantity_hb_pre_cv19))
-plan(sequential)
-
-hcq_hb_cv_models %>%
-  saveRDS("../data/hcq_hb_cv_models.rds")
+# plan(multisession)
+# with_progress(system.time(hcq_hb_cv_models <-
+#   regionalCV(data = hcq_monthly_quantity_hb_pre_cv19)))
+# plan(sequential)
+# 
+# hcq_hb_cv_models %>%
+#   saveRDS("../data/hcq_hb_cv_models.rds")
 
 hcq_hb_cv_models <- 
   read_rds("../data/hcq_hb_cv_models.rds")
@@ -293,12 +308,12 @@ hcq_hb_cv_models %>%
 * 756.556 seconds 2021-01-12
 
 ```{r}
-plan(cluster)
-system.time(hcq_hb_fcsts <- regionalJointFcsts(hcq_monthly_quantity_hb_pre_cv19))
-plan(sequential)
-
-hcq_hb_fcsts %>%
-  saveRDS("../data/hcq_hb_fcsts.rds")
+# plan(cluster)
+# system.time(hcq_hb_fcsts <- regionalJointFcsts(hcq_monthly_quantity_hb_pre_cv19))
+# plan(sequential)
+# 
+# hcq_hb_fcsts %>%
+#   saveRDS("../data/hcq_hb_fcsts.rds")
 
 hcq_hb_fcsts <- 
   read_rds("../data/hcq_hb_fcsts.rds")
@@ -311,13 +326,13 @@ hcq_hb_fcsts <-
 ### By GP Cluster
 
 ```{r, gp-cluster-modelling}
-# plan(multisession)
-# system.time(hcq_gp_cluster_cv_models <-
-#   regionalCV(data = hcq_monthly_quantity_cluster_pre_cv19))
-# plan(sequential)
-# 
-# hcq_gp_cluster_cv_models %>%
-#   saveRDS("../data/hcq_gp_cluster_cv_models.rds")
+plan(multisession)
+system.time(hcq_gp_cluster_cv_models <-
+  regionalCV(data = hcq_monthly_quantity_cluster_pre_cv19))
+plan(sequential)
+
+hcq_gp_cluster_cv_models %>%
+  saveRDS("../data/hcq_gp_cluster_cv_models.rds")
 
 hcq_gp_cluster_cv_models <- 
   read_rds("../data/hcq_gp_cluster_cv_models.rds")
@@ -349,13 +364,13 @@ hcq_gp_cluster_cv_models %>%
 * 
 
 ```{r}
-# plan(multisession)
-# system.time(hcq_gp_cluster_fcsts <- 
-#               regionalJointFcsts(hcq_monthly_quantity_cluster_pre_cv19))
-# plan(sequential)
-# 
-# hcq_gp_cluster_fcsts %>%
-#   saveRDS("../data/hcq_gp_cluster_fcsts.rds")
+plan(multisession)
+system.time(hcq_gp_cluster_fcsts <-
+              regionalJointFcsts(hcq_monthly_quantity_cluster_pre_cv19))
+plan(sequential)
+
+hcq_gp_cluster_fcsts %>%
+  saveRDS("../data/hcq_gp_cluster_fcsts.rds")
 
 hcq_gp_cluster_fcsts <- 
   read_rds("../data/hcq_gp_cluster_fcsts.rds")
@@ -366,23 +381,44 @@ hcq_gp_cluster_fcsts <-
 ### By Practice
 
 ```{r, gp-practice-modelling}
-incomplete_gp <- hcq_monthly_quantity_gp_pre_cv19 %>% 
-    as_tibble() %>% 
-    group_by(regional_unit) %>% 
-    count() %>% 
-    filter(n < 50) %>% 
-    .$regional_unit %>% 
-    unique()
+complete_gp <- 
+  hcq_monthly_quantity_gp_pre_cv19 %>% 
+  as_tibble() %>% 
+  group_by(regional_unit) %>% 
+  count() %>% 
+  filter(n >= 62) %>% 
+  .$regional_unit %>% 
+  unique()
 
-plan(cluster)
-system.time(hcq_gp_cv_models <-
-  hcq_monthly_quantity_gp_pre_cv19 %>%
-    filter(!regional_unit %in% incomplete_gp) %>%
-              regionalCV())
-plan(sequential)
 
-hcq_gp_cv_models %>%
-  saveRDS("../data/hcq_gp_cv_models.rds")
+# plan(multisession)
+# # Chunking analyses into ~100 GPs uses ~ 23Gb of RAM
+# system.time(hcq_gp_cv_models_1 <-
+#   hcq_monthly_quantity_gp_pre_cv19 %>%
+#     filter(regional_unit %in% complete_gp[1:100]) %>% 
+#               regionalCV(init = 48))
+# system.time(hcq_gp_cv_models_2 <-
+#   hcq_monthly_quantity_gp_pre_cv19 %>%
+#     filter(regional_unit %in% complete_gp[101:200]) %>% 
+#               regionalCV(init = 48))
+# system.time(hcq_gp_cv_models_3 <-
+#   hcq_monthly_quantity_gp_pre_cv19 %>%
+#     filter(regional_unit %in% complete_gp[201:300]) %>% 
+#               regionalCV(init = 48))
+# system.time(hcq_gp_cv_models_4 <-
+#   hcq_monthly_quantity_gp_pre_cv19 %>%
+#     filter(regional_unit %in% complete_gp[301:length(complete_gp)]) %>% 
+#               regionalCV(init = 48))
+# plan(sequential)
+# 
+# hcq_gp_cv_models <- 
+#   bind_rows(hcq_gp_cv_models_1,
+#             hcq_gp_cv_models_2,
+#             hcq_gp_cv_models_3,
+#             hcq_gp_cv_models_4)
+# 
+# hcq_gp_cv_models %>%
+#   saveRDS("../data/hcq_gp_cv_models.rds")
 
 hcq_gp_cv_models <- 
   read_rds("../data/hcq_gp_cv_models.rds")
@@ -426,6 +462,20 @@ best_model_gp %>%
   select(-c(.model, .type)) %>% 
   DataExplorer::plot_correlation()
 
+hcq_monthly_quantity_gp_pre_cv19 %>% 
+  as_tibble() %>% 
+  group_by(regional_unit) %>% 
+  summarise(mean_quantity = mean(n))
+
+best_model_gp %>% 
+  left_join(hcq_monthly_quantity_gp_pre_cv19 %>% 
+              as_tibble() %>% 
+              group_by(regional_unit) %>% 
+              summarise(mean_quantity = mean(n)), 
+            by = c("regional_unit")) %>% 
+  select(-c(.model, .type)) %>% 
+  DataExplorer::plot_correlation()
+
 ```
 
 
@@ -434,7 +484,7 @@ best_model_gp %>%
 plan(cluster)
 system.time(hcq_gp_fcsts <-
               hcq_monthly_quantity_gp_pre_cv19 %>%
-              filter(!regional_unit %in% incomplete_gp) %>%
+              filter(regional_unit %in% complete_gp) %>%
               regionalJointFcsts())
 plan(sequential)
 
@@ -444,13 +494,9 @@ hcq_gp_fcsts %>%
 hcq_gp_fcsts <- 
   read_rds("../data/hcq_gp_fcsts.rds")
 
-hcq_gp_fcsts %>% 
-  group_by(.model) %>% 
-  count
-
 ```
 
-* 
+* 2755.011 seconds 2021-01-13
 
 ## Discrepancies
 
@@ -576,20 +622,6 @@ best_model_gp_discrep %>%
 
 ```
 
-```{r}
-best_model_gp_discrep %>% 
-  filter(discrepancy < -40)
-
-hcq_monthly_quantity_gp %>% 
-  filter(regional_unit %in% c("W97009", "W98053")) %>% 
-  as_tsibble(key = regional_unit, index = datename) %>% 
-  autoplot()
-
-gp %>% 
-  filter(practiceid %in% c("W97009", "W98053"))
-```
-
-* Based on postcodes, these are both University GPs. Or at least, given their procimity to universities, they will likely have large student populations.
 
 #### Latent profile analysis
 
@@ -613,8 +645,6 @@ gp_lpa_fit %>%
 
 gp_lpa_fit %>%
   plot_profiles(x = ., rawdata = FALSE)
-
-
 ```
 
 #### mplus 
@@ -637,7 +667,7 @@ best_model_gp_discrep %>%
 
 
 
-```{r, mplus-anlayses}
+```{r, mplus-anlayses, eval=FALSE}
 source("../r_scripts/functions/mplus_plotting.R")
 # mplus_models <- MplusAutomation::readModels("../mplus_analyses/hcq_gp")
 
@@ -661,9 +691,10 @@ hcq_discrep_5_class_ml <-
 
 best_mplus_model$class_counts
 
-# mplus.view.plots("../mplus_analyses/hcq_gp/hcq_discrep_5_class_ml.gh5")
-mplus.plot.estimated_means("../mplus_analyses/hcq_gp/hcq_discrep_5_class_ml.gh5")
+# mplus.view.plots("../mplus_analyses/hcq_gp/hcq_discrep_3_class_lgmm_ml.gh5")
+mplus.plot.estimated_means("../mplus_analyses/hcq_gp/hcq_discrep_3_class_lgmm_ml.gh5")
 ```
+
 #### kmeans
 
 ```{r, gp-kmeans}
