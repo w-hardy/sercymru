@@ -272,13 +272,13 @@ hcq_monthly_count %>%
 ### By Health Board
 
 ```{r, health-board-modelling}
-# plan(multisession)
-# with_progress(system.time(hcq_hb_cv_models <-
-#   regionalCV(data = hcq_monthly_quantity_hb_pre_cv19)))
-# plan(sequential)
-# 
-# hcq_hb_cv_models %>%
-#   saveRDS("../data/hcq_hb_cv_models.rds")
+plan(cluster)
+with_progress(system.time(hcq_hb_cv_models <-
+  regionalCV(data = hcq_monthly_quantity_hb_pre_cv19)))
+plan(sequential)
+
+hcq_hb_cv_models %>%
+  saveRDS("../data/hcq_hb_cv_models.rds")
 
 hcq_hb_cv_models <- 
   read_rds("../data/hcq_hb_cv_models.rds")
