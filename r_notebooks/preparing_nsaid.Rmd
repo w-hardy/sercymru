@@ -51,7 +51,7 @@ nsaid <-
   read_rds("../data/presdata_updates_040121/presc_wales_NSAIDs.rds") %>% 
   janitor::clean_names() %>% 
   mutate(datename = dmy(paste0("28-", datename)),
-         practice_id = as_factor(practice_id))
+         practice_id = as_factor(practiceid))
 
 ## All data sorted into monthly summary
 nsaid_monthly_count <- 
