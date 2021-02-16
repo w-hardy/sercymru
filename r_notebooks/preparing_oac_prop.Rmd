@@ -184,7 +184,6 @@ best_mape_over_50 <-
 plan(cluster)
 system.time(oac_gp_fcsts <-
               oac_monthly_prop_gp_pre_cv19 %>%
-              filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
               regionalJointFcstsBound(h = "6 months"))
 plan(sequential)
 

@@ -1,5 +1,5 @@
 ---
-title: "Respiratory famotsteroids"
+title: "Famotodine"
 output: 
   html_document:
     code_folding: hide
@@ -36,6 +36,8 @@ set.seed(32)
 ```
 
 ## Preparing data
+
+* Daily quantity per 10,000,000 patients due to low prescribing volumes
 
 ```{r famot-data}
 gp <- 
@@ -81,7 +83,7 @@ famot_monthly_quantity_gp <-
   as_tibble() %>% 
   inner_join(gp, 
             by = c("regional_unit" = "practice_id", "year")) %>% 
-  mutate(n = 1000*n/npat,
+  mutate(n = 10000000*n/npat,
          datename = yearmonth(datename),
          regional_unit = as_factor(regional_unit)) %>% 
   select(-c(npat, year)) %>% 
