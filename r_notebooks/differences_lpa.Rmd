@@ -1,0 +1,551 @@
+---
+title: "Differences LPA"
+author: "Will A. S. Hardy"
+date: "27/01/2021"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tsibble)
+library(tidyLPA)
+library(future)
+library(furrr)
+library(tidymodels)
+library(workflows)
+library(tune)
+
+knitr::opts_chunk$set(echo = TRUE)
+
+set.seed(32)
+
+gp <- 
+  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL,
+         practice_id = as_factor(practiceid),
+         dispensing = as_factor(dispensing),
+         hboard = as_factor(hboard)) %>% 
+  ungroup() %>% 
+  janitor::clean_names()
+
+differences_files <- 
+  list.files("../data/differences/")
+names(differences_files) <- 
+  str_remove_all(differences_files, "_discreps.rds")
+
+differences <- 
+  map_dfr(.x = differences_files,
+          .f = ~read_rds(paste0("../data/differences/", .x)),
+          .id = "drug") %>% 
+  mutate(drug = as_factor(drug)) %>% 
+  select(drug, regional_unit, datename, discrepancy)
+
+drugs <- unique(as.character(differences$drug))
+
+```
+
+
+## Data cleaning
+
+```{r, data-problem-values, warning=FALSE}
+differences %>% 
+  pivot_wider(names_from = datename, values_from = discrepancy) %>% 
+  psych::describeBy(group = "drug", fast = TRUE)
+```
+
+* Problem with `oac` data
+* Infinite values have been calculated when something has been divided by zero. Is this when the total prescribing of oac has been zero, thus wafarin as a percentage of 0 is Inf?
+
+```{r, data-which-problem}
+differences %>% 
+  filter(drug == "oac" & 
+           (is.na(discrepancy) | is.nan(discrepancy) | is.infinite(discrepancy))) %>% 
+  group_by(datename) %>% 
+  count()
+
+differences %>% 
+  filter(drug == "oac" & 
+           (is.na(discrepancy) | is.nan(discrepancy) | is.infinite(discrepancy))) %>% 
+  group_by(drug, regional_unit) %>% 
+  count()
+```
+
+* Missing/inappropriate data in five practices
+* Removed these practices from the `oac` data
+
+```{r, data-cleaning}
+differences <- 
+  differences %>% 
+  anti_join(y = differences %>% 
+              filter(drug == "oac" & 
+                       (is.na(discrepancy) |
+                          is.nan(discrepancy) | 
+                          is.infinite(discrepancy))) %>% 
+              group_by(drug, regional_unit) %>% 
+              count(), 
+            by = c("drug", "regional_unit"))
+
+differences_wide <- 
+  differences %>% 
+  pivot_wider(names_from = datename, values_from = discrepancy)
+```
+
+
+## Latent profile analysis
+
+When conducting LPA, several models are specified and then evaluated. Model selection, including class enumeration, should not be based solely on statistical criteria, but also the statistical adequacy and substantive meaning of the solutions [@Marsh2009; @Morin2016]. Indeed, relying solely on statistical criteria in large samples may lead to the inability to identify an "optimal solution" as model fit increases as the number of classes increase [@Morin2009].
+
+In this study we inspected the Bayesian Information Criterion [BIC; @someone], the bootstrapped likelihood ratio test [BLRT; @someone], the sample adjusted BIC [SABIC; @someone], and an analytical hierarchy proposed by Akogul & Erisoglu [-@Akogul2017] which evaluates five information criteria simultaneously. 
+
+* Entropy
+
+### ace
+
+```{r, ace-lpa}
+ace_lpa <- 
+  differences_wide %>% 
+  filter(drug == "ace") %>% 
+  estimate_profiles(df = ., 
+                    select_vars = c("2020 Mar", "2020 Apr", "2020 May", 
+                                    "2020 Jun", "2020 Jul", "2020 Aug"),
+                    n_profiles = 1:8,
+                    models = c(1:3))
+```
+
+
+```{r, ace-fits}
+ace_lpa
+compare_solutions(ace_lpa, statistics = c("BIC", "AIC", "SABIC", "BLRT_p"))
+```
+
+
+```{r}
+ace_lpa %>%
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+
+differences_wide %>% 
+  filter(drug == "ace") %>% 
+  estimate_profiles(df = ., 
+                    select_vars = c("2020 Mar", "2020 Apr", "2020 May", 
+                                    "2020 Jun", "2020 Jul", "2020 Aug"),
+                    n_profiles = c(4,5,6,8),
+                    models = 2) %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+```
+
+* 
+
+```{r}
+ace_lpa$model_2_class_5 %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+
+ace_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  ggplot(aes(x = datename, y = difference, group = rowname, colour = rowname)) +
+  geom_line(alpha = .1) +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+ace_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) %>% 
+  ggplot(aes(x = datename, y = difference, colour = Class)) +
+  geom_boxplot() +
+  geom_point(alpha = .1, position=position_jitterdodge(dodge.width=0.75)) +
+  theme(legend.position = "none")
+
+df <- 
+  ace_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) 
+
+df %>% 
+  ggplot(aes(x = datename, y = difference)) +
+  geom_line(aes(colour = as.factor(rowname), group = rowname), alpha = .1) +
+  stat_summary(fun = "mean") +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+ace_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  # pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+  #              names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) %>% 
+  aov(`2020 Mar` ~ Class, data = .) %>% 
+  # summary() %>% 
+  TukeyHSD()
+```
+
+
+### adreno
+
+```{r, adreno-lpa}
+adreno_lpa <- 
+  differences_wide %>% 
+  filter(drug == "adreno") %>% 
+  estimate_profiles(df = ., 
+                    select_vars = c("2020 Mar", "2020 Apr", "2020 May", 
+                                    "2020 Jun", "2020 Jul", "2020 Aug"),
+                    n_profiles = 1:8,
+                    models = c(1:3))
+```
+
+
+```{r}
+adreno_lpa
+compare_solutions(adreno_lpa, statistics = c("BIC", "AIC", "SABIC", "BLRT_p"))
+```
+
+
+```{r}
+adreno_lpa %>%
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+
+differences_wide %>% 
+  filter(drug == "adreno") %>% 
+  estimate_profiles(df = ., 
+                    select_vars = c("2020 Mar", "2020 Apr", "2020 May", 
+                                    "2020 Jun", "2020 Jul", "2020 Aug"),
+                    n_profiles = c(4,5,6,8),
+                    models = 2) %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+```
+
+* Different fit statistics suggest different models best fit the data. Increasing the number of classes does not change the shapes of the profiles, it merely splits existing profiles into smaller units.
+* Retain the five class solution based on principle of parsimony and interpretability. 
+
+```{r}
+adreno_lpa$model_2_class_5 %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+
+adreno_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  ggplot(aes(x = datename, y = difference, group = rowname, colour = rowname)) +
+  geom_line(alpha = .1) +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+adreno_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) %>% 
+  ggplot(aes(x = datename, y = difference, colour = Class)) +
+  geom_boxplot() +
+  geom_point(alpha = .1, position=position_jitterdodge(dodge.width=0.75)) +
+  theme(legend.position = "none")
+
+df <- 
+  adreno_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) 
+
+df %>% 
+  ggplot(aes(x = datename, y = difference)) +
+  geom_line(aes(colour = as.factor(rowname), group = rowname), alpha = .1) +
+  stat_summary(fun = "mean") +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+adreno_lpa$model_2_class_5 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  # pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+  #              names_to = "datename") %>% 
+  mutate(Class = as.factor(Class)) %>% 
+  aov(`2020 Mar` ~ Class, data = .) %>% 
+  # summary() %>% 
+  TukeyHSD()
+```
+### azithro
+
+### contra
+
+### cortico
+
+### hcq
+
+### nsaid
+
+### oac
+
+```{r, oac-lpa}
+oac_lpa <- 
+  differences_wide %>% 
+  filter(drug == "oac") %>% 
+  estimate_profiles(df = ., 
+                    select_vars = c("2020 Mar", "2020 Apr", "2020 May", 
+                                    "2020 Jun", "2020 Jul", "2020 Aug"),
+                    n_profiles = 1:8,
+                    models = c(1:3))
+```
+
+
+```{r}
+compare_solutions(oac_lpa, statistics = c("BIC", "AIC", "SABIC", "BLRT_p"))
+```
+
+
+```{r}
+oac_lpa %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+```
+
+```{r}
+oac_lpa$model_3_class_2 %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+
+oac_lpa$model_3_class_2 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  ggplot(aes(x = datename, y = difference, group = rowname, colour = rowname)) +
+  geom_line(alpha = .1) +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+df <- 
+  oac_lpa$model_3_class_2 %>% 
+  get_data() %>% 
+  select(-c(model_number, classes_number, starts_with("CPROB"))) %>% 
+  rownames_to_column() %>% 
+  pivot_longer(cols = `2020 Mar`:`2020 Aug`, values_to = "difference", 
+               names_to = "datename") %>% 
+  mutate(Class = as.factor(Class),
+               datename = yearmonth(datename)) 
+
+df %>% 
+  ggplot(aes(x = as.factor(datename), y = difference, color = Class)) +
+  geom_boxplot() +
+  geom_point(shape = 3, alpha = .3, 
+             position=position_jitterdodge(dodge.width=0.75)) +
+  theme(legend.position = "none")
+
+df %>% 
+  ggplot(aes(x = datename, y = difference)) +
+  geom_line(aes(colour = as.factor(rowname), group = rowname), alpha = .1) +
+  stat_summary(fun = "mean") +
+  facet_wrap(~Class) +
+  theme(legend.position = "none")
+
+```
+
+### paracet
+
+### vitd
+
+### All
+
+```{r, lpa-models-nested, include=FALSE}
+tictoc::tic()
+lpa_analysis <- 
+  differences_wide %>% 
+  anti_join(y = differences_wide %>% # These cause computation issues. Look at separately.
+              filter(drug == "ace" & `2020 Jul` < -50),
+            by = c("drug", "regional_unit")) %>%
+  nest_by(drug) %>% 
+  mutate(lpa_models = list(estimate_profiles(df = data[2:7],
+                                      n_profiles = 1:8, 
+                                      models = c(1:3))),
+         lpa_fits = list(compare_solutions(lpa_models, 
+                                           statistics = c("BIC", "AIC", "BLRT_p", "prob_min", "Entropy"))),
+         lpa_plots = list(plot_profiles(lpa_models, 
+                                        rawdata = FALSE, 
+                                        sd = FALSE)),
+         best_lpa_rn = as.numeric(list(lpa_fits$AHP)),
+         best_lpa_fit = list(lpa_fits$fits[lpa_fits$AHP,]),
+         best_lpa_model = flatten(list(lpa_models[lpa_fits$AHP])),
+         classes = list(flatten(flatten(list(lpa_models[lpa_fits$AHP])))$model$classification),
+         class_count = list(table(flatten(flatten(list(lpa_models[lpa_fits$AHP])))$model$classification)),
+         lpa_class = list(bind_cols(drug = drug, 
+                                    regional_unit = data$regional_unit, 
+                                    lpa_class = classes)))
+tictoc::toc()
+```
+
+```{r, lpa-best-model-plot, include=FALSE}
+lpa_analysis <- 
+  lpa_analysis %>% 
+  mutate(best_lpa_model_plot = list(plot_profiles(best_lpa_model, 
+                                                  rawdata = FALSE, 
+                                                  sd = FALSE)),
+         best_lpa_model_plot_lab = list(best_lpa_model_plot + 
+                                          labs(title = drug)),
+         best_lpa_cprob = list(select(best_lpa_model$dff,
+                                      starts_with("CPROB"), Class)))
+
+lpa_analysis %>% 
+  pluck("best_lpa_cprob") %>% 
+  set_names(drugs)
+
+```
+
+```{r, lpa-best-model-plot-2}
+lpa_analysis$lpa_fits
+
+lpa_analysis %>% 
+  pluck("class_count") %>% 
+  set_names(drugs) %>% 
+  bind_rows(.id = "drug")
+
+```
+
+
+```{r}
+lpa_analysis$lpa_fits %>% 
+  set_names(drugs) %>% 
+  pluck("cortico")
+
+lpa_analysis$lpa_models %>% 
+  set_names(drugs) %>% 
+  pluck("cortico")
+
+lpa_analysis$lpa_models %>% 
+  set_names(drugs) %>% 
+  pluck("cortico") %>% 
+  pluck("model_2_class_6") %>% 
+  plot_profiles(rawdata = FALSE, sd = FALSE)
+```
+
+
+```{r, lpa-best-model-class-assignment}
+lpa_analysis %>% 
+  pluck("lpa_class") %>% 
+  bind_rows() %>% 
+  pivot_wider(names_from = drug, names_prefix = "lpa_class_",
+              values_from = lpa_class)
+
+```
+
+
+### Outliers
+
+```{r, lpa-models, eval=FALSE}
+drugs <- unique(as.character(differences$drug))
+
+differences_wide <- 
+  differences %>% 
+  pivot_wider(names_from = datename, values_from = discrepancy)
+
+system.time(differences_wide %>% 
+              filter(drug == "oac") %>% 
+              ungroup() %>% 
+              select(`2020 Mar`:`2020 Aug`) %>% 
+              estimate_profiles(df = ., n_profiles = 1:5, models = c(1:3, 6)))
+
+lpaProfiles <- function(data, filter){
+  data %>% 
+    filter(drug == filter) %>% 
+    ungroup() %>% 
+    select(`2020 Mar`:`2020 Aug`) %>% 
+    estimate_profiles(df = ., n_profiles = 1:5, models = c(1:3, 6))
+}
+
+plan(cluster)
+system.time(lpa_fits <- 
+              future_map(.x = drugs,
+                         .f = ~lpaProfiles(differences_wide, .x)))
+plan(sequential)
+
+lpa_fits %>% 
+  saveRDS("../data/models/lpa_fits.rds")
+```
+
+
+```{r, seperate-lpa-models, eval=FALSE}
+lpaProfiles <- function(data, filter){
+  data %>% 
+    filter(drug == filter) %>% 
+    ungroup() %>% 
+    select(`2020 Mar`:`2020 Aug`) %>% 
+    estimate_profiles(df = ., n_profiles = 1:6, models = c(1:3, 6))
+}
+
+tictoc::tic()
+system.time(oac_lpa <- lpaProfiles(differences_wide, "oac"))
+print("step 1")
+print("step 2")
+system.time(azithro_lpa <- lpaProfiles(differences_wide, "azithro"))
+print("step 3")
+system.time(contra_lpa <- lpaProfiles(differences_wide, "contra"))
+print("step 4")
+system.time(cortico_lpa <- lpaProfiles(differences_wide, "cortico"))
+print("step 5")
+system.time(hcq_lpa <- lpaProfiles(differences_wide, "hcq"))
+print("step 6")
+system.time(nsaid_lpa <- lpaProfiles(differences_wide, "nsaid"))
+print("step 7")
+system.time(vitd_lpa <- lpaProfiles(differences_wide, "vitd"))
+print("step 8")
+system.time(paracet_lpa <- lpaProfiles(differences_wide, "paracet"))
+print("step 9")
+#system.time(adreno_lpa <- lpaProfiles(differences_wide, "adreno"))
+system.time(ace_lpa <- differences_wide %>%
+              filter(drug == "ace") %>% 
+              filter(`2020 Jul` > -50) %>% # Outliers causing computation problems
+              estimate_profiles(df = .[3:8], 
+                                n_profiles = 1:6, 
+                                models = c(1:3, 6)))
+print("step 10")
+lpa_sep_fits <- list(ace_lpa, azithro_lpa, contra_lpa, cortico_lpa, 
+                     hcq_lpa, nsaid_lpa, oac_lpa, paracet_lpa, vitd_lpa)
+tictoc::toc()
+
+
+```
+
+
+```{r, adreno-lpa, eval=FALSE}
+system.time(differences_wide %>% 
+              filter(drug == "adreno") %>% 
+              # filter(`2020 Jul` > -50) %>% # Outliers causing computation problems
+              estimate_profiles(df = .[c(3:8)], 
+                                n_profiles = 1:5, 
+                                models = c(1:3,6)) %>% 
+              plot_profiles(rawdata = FALSE))
+
+## Models 1:3
+# 2708.712 secs with df = .[c(3:5)]
+# 63.237 secs with df = .[c(3:6)]
+# 1101.290 secs with df = .[c(3:7)]
+# 1618.723 secs with df = .[c(3:8)]
+## Models 1:3, 6
+# 2338.966 secs with df = .[c(3:8)]
+
+differences_wide %>% 
+  filter(drug == "adreno") %>% 
+  ggplot(aes(x = `2020 May`)) +
+  geom_histogram()
+```
+
+
