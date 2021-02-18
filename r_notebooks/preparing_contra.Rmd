@@ -242,11 +242,9 @@ best_model_gp_discrep <-
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = n - .mean) %>% 
+  mutate(discrepancy = n - med, # observed - forecast
+         prop = n / med) %>% 
   ungroup()
-
-best_model_gp_discrep %>% 
-  saveRDS("../data/differences/contra_discreps.rds")
 
 best_model_gp_discrep %>% 
   ggplot(aes(y = discrepancy)) +
@@ -255,5 +253,32 @@ best_model_gp_discrep %>%
             alpha = .8, lty = 2) +
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
+
+best_model_gp_discrep %>% 
+  ggplot(aes(y = prop)) +
+  geom_line(aes(x = datename, y = prop, 
+                colour = as.factor(regional_unit)),
+            alpha = .8, lty = 2) +
+  geom_hline(aes(yintercept = 0), colour = "red") +
+  theme(legend.position = "none")
+
+
+contra_monthly_quantity_gp %>% 
+  filter(regional_unit %in%
+           (best_model_gp_discrep %>%
+           filter(prop < .25) %>%
+           .$regional_unit %>%
+           unique())) %>%
+  autoplot()
+
+gp %>% 
+    filter(practice_id %in% 
+           (best_model_gp_discrep %>% 
+           filter(prop <.25) %>% 
+           .$regional_unit %>% 
+           unique()))
+
+best_model_gp_discrep %>% 
+  saveRDS("../data/differences/contra_discreps.rds")
 
 ```

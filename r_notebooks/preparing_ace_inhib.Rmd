@@ -219,7 +219,7 @@ ace_gp_fcsts <-
 
 ## Discrepancies
 
-```{r, ace-gp-practice-discrepancies}
+```{r, ace-gp-practice-discrepancies-abs}
 best_model_gp <- 
   ace_gp_cv_models %>% 
   group_by(regional_unit) %>% 
@@ -241,11 +241,9 @@ best_model_gp_discrep <-
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
-  mutate(discrepancy = n - .mean) %>% 
+  mutate(discrepancy = n - med, # observed - forecast
+         prop = n / med) %>% 
   ungroup()
-
-best_model_gp_discrep %>% 
-  saveRDS("../data/differences/ace_discreps.rds")
 
 best_model_gp_discrep %>% 
   ggplot(aes(y = discrepancy)) +
@@ -255,4 +253,38 @@ best_model_gp_discrep %>%
   geom_hline(aes(yintercept = 0), colour = "red") +
   theme(legend.position = "none")
 
+best_model_gp_discrep %>% 
+  ggplot(aes(y = prop)) +
+  geom_line(aes(x = datename, y = prop, 
+                colour = as.factor(regional_unit)),
+            alpha = .8, lty = 2) +
+  geom_hline(aes(yintercept = 0), colour = "red") +
+  theme(legend.position = "none")
+
+
+ace_monthly_quantity_gp %>% 
+  filter(regional_unit %in%
+           (best_model_gp_discrep %>%
+           filter(prop < .5) %>%
+           .$regional_unit %>%
+           unique())) %>%
+  autoplot()
+
+gp %>% 
+    filter(practice_id %in% 
+           (best_model_gp_discrep %>% 
+           filter(prop <.25) %>% 
+           .$regional_unit %>% 
+           unique()))
+
+changes_pre_covid <- c("W95007", "W91020") # Significant changes to prescribing near the end of 2019
+
+best_model_gp_discrep <- 
+  best_model_gp_discrep %>% 
+  filter(!regional_unit %in% changes_pre_covid)
+
+best_model_gp_discrep %>% 
+  saveRDS("../data/differences/ace_discreps.rds")
 ```
+
+* `r length(changes_pre_covid)` GPs excluded as there was a significant change to their prescribing pre-covid
