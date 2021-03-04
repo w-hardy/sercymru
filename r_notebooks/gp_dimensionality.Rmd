@@ -1,0 +1,113 @@
+---
+title: "gp_dimensionality"
+author: "Will A. S. Hardy"
+date: "26/02/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lavaan)
+
+set.seed(376)
+knitr::opts_chunk$set(echo = TRUE)
+gp <- 
+  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL,
+         practice_id = as_factor(practiceid),
+         dispensing = as_factor(dispensing),
+         hboard = as_factor(str_remove_all(hboard, "W110000")),
+         cluster = as_factor(cluster)) %>% 
+  ungroup() %>% 
+  filter(year == 2020) %>% 
+  select(-c(practiceid, postcode, easting, northing, lsoacode, year)) %>% 
+  janitor::clean_names() %>%
+  mutate(across(chd:flu, .fns = ~.x*100))
+
+gp1 <- 
+  slice_sample(gp, prop = .5) 
+gp2 <- 
+  filter(gp, practice_id %in% gp1$practice_id)
+```
+
+
+```{r, inspect-data}
+gp %>%
+  select(chd:flu) %>% 
+  psych::describe() %>% 
+  arrange(sd)
+
+gp %>%
+  select(chd:flu) %>% 
+  DataExplorer::plot_histogram()
+```
+
+## QOF disease register EFA
+
+```{r}
+df <- select(gp1, chd:flu)
+psych::fa.parallel(df)
+
+three_fac <- psych::fa(df, nfactors = 3, rotate = "varimax")
+four_fac <- psych::fa(df, nfactors = 4, rotate = "varimax")
+five_fac <- psych::fa(df, nfactors = 5, rotate = "varimax")
+print(three_fac$loadings, cutoff = .2)
+print(four_fac$loadings, cutoff = .2)
+```
+
+```{r}
+
+summary(three_fac)
+summary(four_fac)
+summary(five_fac)
+```
+
+## QOF disease register CFA
+
+```{r, cfa-1}
+cfa1 <- 
+'
+  level: 1
+  cardio      =~ af + chd + hf + hyp + str
+  pulmonary   =~ flu + ast + copd
+  cognitive   =~ dem +lrn + men
+  f4          =~ diab + obi
+  age         =~ can + ost + pal
+  
+  level: 2 # Saturated correlation matrix
+  # af    ~~ af + chd + hf + hyp + str + flu + ast + copd
+  # chd   ~~ chd + hf + hyp + str + flu + ast + copd
+  # hf    ~~ hf + hyp + str + flu + ast + copd
+  # hyp   ~~ hyp + str + flu + ast + copd
+  # str   ~~ str + flu + ast + copd
+  # flu   ~~ flu + ast + copd
+  # ast   ~~ ast + copd
+  # copd  ~~ copd
+  
+  af    ~~ af + chd + hf + hyp + str + flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  chd   ~~ chd + hf + hyp + str + flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  hf    ~~ hf + hyp + str + flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  hyp   ~~ hyp + str + flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  str   ~~ str + flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  flu   ~~ flu + ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  ast   ~~ ast + copd + lrn + men + diab + obi + can + dem + ost + pal
+  copd  ~~ copd + lrn + men + diab + obi + can + dem + ost + pal
+  lrn   ~~ lrn + men + diab + obi + can + dem + ost + pal
+  men   ~~ men + diab + obi + can + dem + ost + pal
+  diab  ~~ diab + obi + can + dem + ost + pal
+  obi   ~~ obi + can + dem + ost + pal
+  can   ~~ can + dem + ost + pal
+  dem   ~~ dem + ost + pal
+  ost   ~~ ost + pal
+  pal   ~~ pal
+'
+# rar epi 
+
+fit1 <- sem(model = cfa1, data = gp1, cluster = "cluster", estimator = "MLR")
+
+summary(fit1, fit.measures=TRUE, standardized = TRUE)
+
+lavInspect(fit1, "icc")
+```
+
