@@ -62,6 +62,7 @@ output            :
 
 ```{r setup, include = FALSE}
 ## Packages
+devtools::install_github("https://github.com/w-hardy/serCymruTools")
 library(tidyverse)
 library(lubridate)
 library(tsibble)
@@ -69,6 +70,7 @@ library(rstan) # needed to load prophet
 library(prophet)
 library(fable)
 library(fable.prophet)
+library(fasster)
 library(feasts)
 library(furrr)
 library(rebus)
@@ -134,31 +136,37 @@ Identifying the effects of COVID-19 is not simple, as its effects are unpreceden
 To understand the changes in levels of prescribing due to COVID-19, it was first necessary for us to forecast the levels of prescribing had COVID-19 not affected Wales as a baseline. To do so, we used historic data (January 2015 to December 2020) to identify from a range of time series models, one that was good fit to the data. This was done using cross-validation to reduce the likelihood of choosing a model that was overfitted to the data.
 
 * Given the presence of seasonal variation and existing trends in levels of prescribing, we used various time series forecasting methods to account for existing trends and seasonal variation when creating the forecasts.
-
-
 * For each analysis, we created a forecast that aimed to answer the question, "What would the levels of prescribing have been if COVID-19 had not affected Wales?" We then used these forecasts to estimate the changes in levels of prescribing due to COVID-19. 
+* We viewed this, somewhat complex, approach as superior to more simple approaches (e.g., carrying last years levels forward, or even using the mean of the last three years).
 
-  * We viewed this, somewhat complex, approach as superior to more simple approaches (e.g., carrying last years levels forward, or even using the mean of the last three years).
+
+### Forecasting models
+
 * We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
-  * Using Jan 2015 to Feb 2020 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
-    * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to reduce computation time) **Do we want to re-run this with 1-month?**
+* We used the `fable` [@R-fable], `fasster` [@R-fasster], and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
+  * Time series linear model
+  * Decomposition model
+  * Seasonal naïve (with and without drift)
+  * Autoregressive integrated moving average [ARIMA; @Box2015]
+  * Holt-Winters Additive Model [@Chatfield1978]
+  * Prophet [@Taylor2018]
+  * Combination models [cf. @Thomson2019]
+* Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
+* Using Jan 2015 to Feb 2020 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
+  * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to reduce computation time) **Do we want to re-run this with 1-month?**
     * Only interested in one forecast horizon: six-months
-    * 
-  * Having chosen the "best model" for each practice based on the pre-COVID data, we then used this to forecast the level of prescribing for each practice
-  
-* We used time series modelling to forecast Welsh primary care prescribing levels had .
-    * We used the `fable` [@R-fable] and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
-    * Time series linear model
-    * Decomposition model
-    * Seasonal naïve (with and without drift)
-    * Autoregressive integrated moving average [ARIMA; @Box2015]
-    * Holt-Winters Additive Model [@Chatfield1978]
-    * Prophet [@Taylor2018]
-    * Combination models [cf. @Thomson2019]
-  * Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
-  * Model selection
-    * RMSE then MAE
 
+
+### Model selection
+
+* Ranked by RMSE and Winkler [@Winkler1972], then the best mean ranking model is chosen
+  * RMSE is scale dependant. Is suitable for comparing models of the same data.
+  * Winkler score penalises models that have observations falling outside the prediction interval, thus rewards models with narrow intervals
+* This combination accounts for both the point and distributional accuracy of the forecasts
+
+### Forecasts
+
+* Having chosen the "best model" for each practice based on the pre-COVID data, we then used this model to forecast the level of prescribing for each practice
 
 
 ## Identifying different prescribing behaviours - LPA
@@ -204,7 +212,7 @@ all_prescribing_fable_fits <-
   all_prescribing_fable_forecasts %>% 
   accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
                            rmse_skill = skill_score(RMSE),
-                           crps_skill = skill_score(CRPS), ACF1 =ACF1,
+                           crps_skill = skill_score(CRPS), ACF1 = ACF1,
                            winkler = winkler_score))
 
 all_prescribing_prophet_fits <- 
@@ -217,16 +225,15 @@ all_prescribing_prophet_fits <-
   forecast(h = 6, point_forecast = list(.median = median)) %>%
   accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
                            rmse_skill = skill_score(RMSE),
-                           crps_skill = skill_score(CRPS), ACF1 =ACF1,
+                           crps_skill = skill_score(CRPS), ACF1 = ACF1,
                            winkler = winkler_score))
 
 all_prescribing_combined_fits <- 
   bind_rows(all_prescribing_fable_fits, all_prescribing_prophet_fits) %>%
-  arrange(RMSE, MAE)
+  rankModels()
 
 all_prescribing_best_model <- 
   all_prescribing_combined_fits %>% 
-  arrange(RMSE, MAE) %>% 
   slice(1, .preserve = TRUE)
 
 
@@ -243,13 +250,22 @@ all_prescribing_covid_forecast <-
                 n = NULL)
 
 plan(sequential)
+
 ```
 
 
 ```{r, all-prescribing-model-accuracy-hist, fig.cap="All prescribing, model accuracy"}
-all_prescribing_combined_fits %>% 
-  ggplot(aes(x = reorder(.model, RMSE, mean), y = RMSE)) +
+p1 <- all_prescribing_combined_fits %>% 
+  na.omit() %>% 
+  ggplot(aes(x = reorder(.model, rank, sort), y = RMSE)) +
   geom_col()
+
+p2 <- all_prescribing_combined_fits %>% 
+  na.omit() %>% 
+  ggplot(aes(x = reorder(.model, rank, sort), y = winkler)) +
+  geom_col()
+
+cowplot::plot_grid(p1, p2)
 ```
 
 
@@ -271,13 +287,16 @@ all_prescribing_best_cv_model %>%
 ```{r, all-prescribing-forecast-plot, fig.cap="All prescribing, best model fit and forecast"}
 all_prescribing %>% 
   ggplot(aes(x = datename)) +
-  geom_line(aes(y = n, col = "Observed")) +
-  geom_line(aes(y = med, col = "Forecast"), 
+  geom_line(aes(y = n, col = "Observed", fill = "Observed")) +
+  geom_line(aes(y = med, col = "Forecast", fill = "Forecast"), 
             data = all_prescribing_covid_forecast) +
-  geom_line(aes(y = fitted, col = "Fitted"), 
+  geom_ribbon(aes(ymin = lb_80, ymax = ub_80, 
+                   fill = "Forecast"), alpha = .5,
+              data = all_prescribing_covid_forecast) +
+  geom_line(aes(y = fitted, col = "Fitted", fill = "Fitted"), 
             data = all_prescribing_best_cv_model %>% 
               group_by(datename) %>% 
-              summarise(fitted = mean(.fitted, na.rm = TRUE))) +
+              summarise(fitted = median(.fitted, na.rm = TRUE))) +
   geom_vline(xintercept = ymd("2020-03-01"), lty = 3)
 ```
 

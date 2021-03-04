@@ -221,7 +221,7 @@ To understand the changes in levels of prescribing due to COVID-19, it was first
   \begin{itemize}
   \tightlist
   \item
-    We used the \texttt{fable} (O'Hara-Wild et al., 2021a) and the \texttt{fable.prophet} (O'Hara-Wild, 2020) packages to conduct the time series analyses.
+    We used the \texttt{fable} (O'Hara-Wild et al., 2021a), \texttt{fasster} (O'Hara-Wild \& Hyndman, 2021), and the \texttt{fable.prophet} (O'Hara-Wild, 2020) packages to conduct the time series analyses.
   \item
     Time series linear model
   \item
@@ -244,7 +244,15 @@ To understand the changes in levels of prescribing due to COVID-19, it was first
     \begin{itemize}
     \tightlist
     \item
-      RMSE then MAE
+      Ranked by RMSE and Winkler ({\textbf{???}}), then the best mean ranking model is chosen
+
+      \begin{itemize}
+      \tightlist
+      \item
+        Winkler score penalises models that have observations falling outside the prediction interval, thus rewards models with narrow intervals
+      \end{itemize}
+    \item
+      This combination accounts for both the point and distributional accuracy of the forecasts
     \end{itemize}
   \end{itemize}
 \end{itemize}
@@ -279,7 +287,7 @@ In this study we inspected the Bayesian Information Criterion (BIC; Schwartz, 19
 \hypertarget{reproducability-and-code}{%
 \subsection{Reproducability and code}\label{reproducability-and-code}}
 
-We used R (Version 4.0.2; R Core Team, 2020) and the R-packages \emph{dplyr} (Version 1.0.4; Wickham, François, et al., 2021), \emph{fable} (Version 0.3.0; O'Hara-Wild et al., 2021a, 2021b; O'Hara-Wild, 2020), \emph{fable.prophet} (Version 0.1.0; O'Hara-Wild, 2020), \emph{fabletools} (Version 0.3.0; O'Hara-Wild et al., 2021b), \emph{feasts} (Version 0.1.7; O'Hara-Wild et al., 2021c), \emph{forcats} (Version 0.5.1; Wickham, 2021), \emph{furrr} (Version 0.2.2; Vaughan \& Dancho, 2021), \emph{future} (Version 1.21.0; Bengtsson, 2020), \emph{ggplot2} (Version 3.3.3; Wickham, 2016), \emph{lubridate} (Version 1.7.10; Grolemund \& Wickham, 2011), \emph{MplusAutomation} (Version 0.8; Hallquist \& Wiley, 2018), \emph{papaja} (Version 0.1.0.9942; Aust \& Barth, 2020), \emph{prophet} (Version 0.6.1; O'Hara-Wild, 2020; Taylor \& Letham, 2020), \emph{purrr} (Version 0.3.4; Henry \& Wickham, 2020a), \emph{Rcpp} (Version 1.0.6; Eddelbuettel \& François, 2011; Eddelbuettel \& Balamuta, 2018), \emph{readr} (Version 1.4.0; Wickham \& Hester, 2020), \emph{rebus} (Version 0.1.3; Cotton, 2017), \emph{rlang} (Version 0.4.10; Henry \& Wickham, 2020b), \emph{rstan} (Version 2.21.2; Stan Development Team, 2020a), \emph{serCymruTools} (Version 0.1.3; Will, 2021), \emph{StanHeaders} (Version 2.21.0.7; Stan Development Team, 2020b), \emph{stringr} (Version 1.4.0; Wickham, 2019), \emph{tibble} (Version 3.1.0; Müller \& Wickham, 2021), \emph{tidyLPA} (Version 1.0.8; Rosenberg et al., 2018), \emph{tidyr} (Version 1.1.3; Wickham, 2020), \emph{tidyverse} (Version 1.3.0; Wickham, Averick, et al., 2019), and \emph{tsibble} (Version 1.0.0; Wang et al., 2020) for all our analyses, functions are available in the \texttt{serCymruTools} package (Will, 2021), and all other code is available at \url{https://github.com/w-hardy/sercymru}.
+We used R (Version 4.0.2; R Core Team, 2020) and the R-packages \emph{dplyr} (Version 1.0.4; Wickham, François, et al., 2021), \emph{fable} (Version 0.3.0; O'Hara-Wild et al., 2021a, 2021b; O'Hara-Wild, 2020), \emph{fable.prophet} (Version 0.1.0; O'Hara-Wild, 2020), \emph{fabletools} (Version 0.3.0; O'Hara-Wild et al., 2021b), \emph{fasster} (Version 0.1.0.9100; O'Hara-Wild \& Hyndman, 2021), \emph{feasts} (Version 0.1.7; O'Hara-Wild et al., 2021c), \emph{forcats} (Version 0.5.1; Wickham, 2021), \emph{furrr} (Version 0.2.2; Vaughan \& Dancho, 2021), \emph{future} (Version 1.21.0; Bengtsson, 2020), \emph{ggplot2} (Version 3.3.3; Wickham, 2016), \emph{lubridate} (Version 1.7.10; Grolemund \& Wickham, 2011), \emph{MplusAutomation} (Version 0.8; Hallquist \& Wiley, 2018), \emph{papaja} (Version 0.1.0.9942; Aust \& Barth, 2020), \emph{prophet} (Version 0.6.1; O'Hara-Wild, 2020; Taylor \& Letham, 2020), \emph{purrr} (Version 0.3.4; Henry \& Wickham, 2020a), \emph{Rcpp} (Version 1.0.6; Eddelbuettel \& François, 2011; Eddelbuettel \& Balamuta, 2018), \emph{readr} (Version 1.4.0; Wickham \& Hester, 2020), \emph{rebus} (Version 0.1.3; Cotton, 2017), \emph{rlang} (Version 0.4.10; Henry \& Wickham, 2020b), \emph{rstan} (Version 2.21.2; Stan Development Team, 2020a), \emph{serCymruTools} (Version 0.1.3; Will, 2021), \emph{StanHeaders} (Version 2.21.0.7; Stan Development Team, 2020b), \emph{stringr} (Version 1.4.0; Wickham, 2019), \emph{tibble} (Version 3.1.0; Müller \& Wickham, 2021), \emph{tidyLPA} (Version 1.0.8; Rosenberg et al., 2018), \emph{tidyr} (Version 1.1.3; Wickham, 2020), \emph{tidyverse} (Version 1.3.0; Wickham, Averick, et al., 2019), and \emph{tsibble} (Version 1.0.0; Wang et al., 2020) for all our analyses, functions are available in the \texttt{serCymruTools} package (Will, 2021), and all other code is available at \url{https://github.com/w-hardy/sercymru}.
 
 \hypertarget{results}{%
 \section{Results}\label{results}}
@@ -290,9 +298,7 @@ We used R (Version 4.0.2; R Core Team, 2020) and the R-packages \emph{dplyr} (Ve
 \hypertarget{all-drugs}{%
 \subsubsection{All drugs}\label{all-drugs}}
 
-\begin{verbatim}
-## Warning: Removed 2 rows containing missing values (position_stack).
-\end{verbatim}
+\includegraphics{paper_files/figure-latex/all-prescribing-modelling-1.pdf}
 
 \begin{figure}
 \centering
@@ -309,6 +315,14 @@ We used R (Version 4.0.2; R Core Team, 2020) and the R-packages \emph{dplyr} (Ve
 \includegraphics{paper_files/figure-latex/all-prescribing-cv-plot-1.pdf}
 \caption{\label{fig:all-prescribing-cv-plot}All prescribing, best model CV fit}
 \end{figure}
+
+\begin{verbatim}
+## Warning: Ignoring unknown aesthetics: fill
+
+## Warning: Ignoring unknown aesthetics: fill
+
+## Warning: Ignoring unknown aesthetics: fill
+\end{verbatim}
 
 \begin{verbatim}
 ## Warning: Removed 12 row(s) containing missing values (geom_path).
@@ -389,6 +403,9 @@ Nylund, K. L., Asparouhov, T., \& Muthén, B. O. (2007). Deciding on the number 
 
 \leavevmode\hypertarget{ref-R-fable.prophet}{}%
 O'Hara-Wild, M. (2020). \emph{Fable.prophet: Prophet modelling interface for 'fable'}. \url{https://CRAN.R-project.org/package=fable.prophet}
+
+\leavevmode\hypertarget{ref-R-fasster}{}%
+O'Hara-Wild, M., \& Hyndman, R. (2021). \emph{Fasster: Fast additive switching of seasonality, trend and exogenous regressors}. \url{https://github.com/mitchelloharawild/fasster}
 
 \leavevmode\hypertarget{ref-R-fable}{}%
 O'Hara-Wild, M., Hyndman, R., \& Wang, E. (2021a). \emph{Fable: Forecasting models for tidy time series}. \url{https://CRAN.R-project.org/package=fable}
