@@ -1,0 +1,310 @@
+---
+title             : "Variation in Primary Care Prescribing in Wales due to COVID-19"
+shorttitle        : "Welsh Primary Care COVID Prescribing"
+
+author: 
+  - name          : "First Author"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "Postal address"
+    email         : "my@email.com"
+  - name          : "Second Author"
+    affiliation   : "1,2"
+
+affiliation:
+  - id            : "1"
+    institution   : "Centre for Health Economics & Medicines Evaluation, Bangor University, LL55 2PZ"
+  - id            : "2"
+    institution   : "Institute for the Psychology of Elite Performance, Bangor University, LL55 2PZ"
+
+authornote: |
+  Add complete departmental affiliations for each author here. Each new line herein must be indented, like this line.
+
+  Enter author note here.
+
+abstract: |
+  One or two sentences providing a **basic introduction** to the field,  comprehensible to a scientist in any discipline.
+  
+  Two to three sentences of **more detailed background**, comprehensible  to scientists in related disciplines.
+  
+  One sentence clearly stating the **general problem** being addressed by  this particular study.
+  
+  One sentence summarizing the main result (with the words "**here we show**" or their equivalent).
+  
+  Two or three sentences explaining what the **main result** reveals in direct comparison to what was thought to be the case previously, or how the  main result adds to previous knowledge.
+  
+  One or two sentences to put the results into a more **general context**.
+  
+  Two or three sentences to provide a **broader perspective**, readily comprehensible to a scientist in any discipline.
+  
+  <!-- https://tinyurl.com/ybremelq -->
+  
+keywords          : "keywords"
+wordcount         : "X"
+
+bibliography      : ["r-references.bib", "../references/library.bib"]
+
+floatsintext      : yes
+figurelist        : no
+tablelist         : no
+footnotelist      : no
+linenumbers       : yes
+mask              : no
+draft             : no
+
+csl               : "../references/apa.csl"
+documentclass     : "apa7"
+classoption       : "man"
+output            : 
+  - papaja::apa6_pdf
+  - papaja::apa6_docx
+---
+
+```{r setup, include = FALSE}
+## Packages
+library(tidyverse)
+library(lubridate)
+library(tsibble)
+library(rstan) # needed to load prophet
+library(prophet)
+library(fable)
+library(fable.prophet)
+library(feasts)
+library(furrr)
+library(rebus)
+library(serCymruTools)
+library(papaja)
+
+r_refs("r-references.bib")
+
+
+## Data
+differences_files <- 
+  list.files("../data/differences/")
+names(differences_files) <- 
+  str_remove_all(differences_files, "_discreps.rds")
+
+differences <- 
+  map_dfr(.x = differences_files,
+          .f = ~read_rds(paste0("../data/differences/", .x)),
+          .id = "drug") %>% 
+  mutate(drug = as_factor(drug)) %>% 
+  select(drug, regional_unit, datename, discrepancy, med)
+
+all_prescribing <- 
+  read_csv("../data/all_prescribing.csv", col_names = c("n", "datename")) %>% 
+  mutate(datename = dmy(paste(28, datename, sep = "-")),
+         datename = yearmonth(datename),
+         regional_unit = factor("all")) %>% 
+  as_tsibble(index = datename) %>% 
+  filter(datename < yearmonth(dmy("01-09-2020")))
+
+all_prescribing_pre_cv19 <- 
+  all_prescribing %>% 
+  filter(datename < yearmonth(dmy("01-03-2020"))) 
+
+
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(32)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE)
+```
+
+
+
+# Methods
+
+
+## Data
+
+* Sources of data
+  * GP
+  * Prescribing
+  * QOF
+  * WIMD
+* Preparing 
+
+
+## Identifying changes in prescribing due to COVID-19
+
+Identifying the effects of COVID-19 is not simple, as its effects are unprecedented and its global impact prevents us from adopting a traditional treatment and control group type design. Instead, we have used time series analysis methods to create counterfactual forecasts 
+
+To understand the changes in levels of prescribing due to COVID-19, it was first necessary for us to forecast the levels of prescribing had COVID-19 not affected Wales as a baseline. To do so, we used historic data (January 2015 to December 2020) to identify from a range of time series models, one that was good fit to the data. This was done using cross-validation to reduce the likelihood of choosing a model that was overfitted to the data.
+
+* Given the presence of seasonal variation and existing trends in levels of prescribing, we used various time series forecasting methods to account for existing trends and seasonal variation when creating the forecasts.
+
+
+* For each analysis, we created a forecast that aimed to answer the question, "What would the levels of prescribing have been if COVID-19 had not affected Wales?" We then used these forecasts to estimate the changes in levels of prescribing due to COVID-19. 
+
+  * We viewed this, somewhat complex, approach as superior to more simple approaches (e.g., carrying last years levels forward, or even using the mean of the last three years).
+* We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
+  * Using Jan 2015 to Feb 2020 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
+    * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to reduce computation time) **Do we want to re-run this with 1-month?**
+    * Only interested in one forecast horizon: six-months
+    * 
+  * Having chosen the "best model" for each practice based on the pre-COVID data, we then used this to forecast the level of prescribing for each practice
+  
+* We used time series modelling to forecast Welsh primary care prescribing levels had .
+    * We used the `fable` [@R-fable] and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
+    * Time series linear model
+    * Decomposition model
+    * Seasonal naïve (with and without drift)
+    * Autoregressive integrated moving average [ARIMA; @Box2015]
+    * Holt-Winters Additive Model [@Chatfield1978]
+    * Prophet [@Taylor2018]
+    * Combination models [cf. @Thomson2019]
+  * Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
+  * Model selection
+    * RMSE then MAE
+
+
+
+## Identifying different prescribing behaviours - LPA
+
+* What is LPA
+  * Differences from clustering methods (e.g., k-means and hierarchical)
+
+When conducting LPA, several models are specified and then evaluated. Model selection, including class enumeration, should not be based solely on statistical criteria, but also the statistical adequacy and substantive meaning of the solutions [@Marsh2009; @Morin2016]. Indeed, relying solely on statistical criteria in large samples may lead to the inability to identify an "optimal solution" as model fit increases as the number of classes increase [@Morin2009].
+
+In this study we inspected the Bayesian Information Criterion [BIC; @Schwartz1978] and the bootstrapped likelihood ratio test [BLRT; @McLachlan2000] during the class enumeration process as the results of Monte-Carlo simulation study [@Nylund2007] showed them outperform other information criteria and likelihood-based tests. 
+
+* Entropy
+* Posterior probabilities
+
+
+## Reproducability and code
+
+We used `r cite_r("r-references.bib")` for all our analyses, functions are available in the `serCymruTools` package [@R-serCymruTools], and all other code is available at https://github.com/w-hardy/sercymru.
+
+
+# Results
+
+## Counterfactual forecasts
+
+### All drugs
+
+```{r all-prescribing-modelling, warning=FALSE}
+plan(cluster)
+
+all_prescribing_fable_models <- 
+  all_prescribing_pre_cv19 %>% 
+  mutate(datename = yearmonth(datename)) %>%
+  fill_gaps() %>%
+  slice(1:(n()-2), .preserve = TRUE) %>%
+  stretch_tsibble(.init = 36, .step = 3) %>%
+  fableModels() 
+
+all_prescribing_fable_forecasts <- 
+  all_prescribing_fable_models %>%
+  forecast(h = 6, point_forecast = list(.median = median))
+
+all_prescribing_fable_fits <- 
+  all_prescribing_fable_forecasts %>% 
+  accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
+                           rmse_skill = skill_score(RMSE),
+                           crps_skill = skill_score(CRPS), ACF1 =ACF1,
+                           winkler = winkler_score))
+
+all_prescribing_prophet_fits <- 
+  all_prescribing_pre_cv19 %>%
+  mutate(datename = yearmonth(datename)) %>%
+  fill_gaps() %>%
+  slice(1:(n()-2), .preserve = TRUE) %>%
+  stretch_tsibble(.init = 36, .step = 3) %>%
+  prophetModels() %>%
+  forecast(h = 6, point_forecast = list(.median = median)) %>%
+  accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
+                           rmse_skill = skill_score(RMSE),
+                           crps_skill = skill_score(CRPS), ACF1 =ACF1,
+                           winkler = winkler_score))
+
+all_prescribing_combined_fits <- 
+  bind_rows(all_prescribing_fable_fits, all_prescribing_prophet_fits) %>%
+  arrange(RMSE, MAE)
+
+all_prescribing_best_model <- 
+  all_prescribing_combined_fits %>% 
+  arrange(RMSE, MAE) %>% 
+  slice(1, .preserve = TRUE)
+
+
+all_prescribing_covid_forecast <- 
+  bind_rows(fableModels(all_prescribing_pre_cv19) %>% 
+            forecast(h = "6 months"),
+          prophetModels(all_prescribing_pre_cv19) %>% 
+            forecast(h = "6 months")) %>% 
+  as_tibble() %>% 
+  filter(.model == all_prescribing_best_model$.model) %>% 
+  dplyr::mutate(lb_95 = quantile(n, 0.025), lb_80 = quantile(n, 0.1), 
+                med = median(n), ub_80 = quantile(n, 0.9), 
+                ub_95 = quantile(n, 0.975), sd = distributional::variance(n)^2, 
+                n = NULL)
+
+plan(sequential)
+```
+
+
+```{r, all-prescribing-model-accuracy-hist, fig.cap="All prescribing, model accuracy"}
+all_prescribing_combined_fits %>% 
+  ggplot(aes(x = reorder(.model, RMSE, mean), y = RMSE)) +
+  geom_col()
+```
+
+
+
+```{r, all-prescribing-cv-plot, fig.cap="All prescribing, best model CV fit"}
+all_prescribing_best_cv_model <- 
+  augment(all_prescribing_fable_models) %>% 
+  as_tibble() %>% 
+  filter(.model == all_prescribing_best_model$.model) 
+
+all_prescribing_best_cv_model %>% 
+  ggplot(aes(x = datename)) +
+  geom_line(aes(y = n/1e+06, colour = "Data")) +
+  geom_line(aes(y = .fitted/1e+06, colour = "Fitted", lty = as.factor(.id))) +
+  labs(lty = "CV iteration")
+```
+
+
+```{r, all-prescribing-forecast-plot, fig.cap="All prescribing, best model fit and forecast"}
+all_prescribing %>% 
+  ggplot(aes(x = datename)) +
+  geom_line(aes(y = n, col = "Observed")) +
+  geom_line(aes(y = med, col = "Forecast"), 
+            data = all_prescribing_covid_forecast) +
+  geom_line(aes(y = fitted, col = "Fitted"), 
+            data = all_prescribing_best_cv_model %>% 
+              group_by(datename) %>% 
+              summarise(fitted = mean(.fitted, na.rm = TRUE))) +
+  geom_vline(xintercept = ymd("2020-03-01"), lty = 3)
+```
+
+
+```{r, all-prescribing-pct-change-plot, fig.cap="Percentage difference in all prescribing"}
+all_prescribing %>% 
+  inner_join(all_prescribing_covid_forecast, by = "datename") %>% 
+  ggplot(aes(x = datename, y = (100*n/med)-100)) +
+  geom_line() +
+  geom_hline(yintercept = 0, lty = 3)
+```
+
+
+### Specific drugs
+
+
+
+# Discussion
+
+
+\newpage
+
+# References
+
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+<div id="refs" custom-style="Bibliography"></div>
+\endgroup
