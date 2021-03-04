@@ -9,6 +9,7 @@ serCymruTools/
 *.sqlite
 *.png
 *.tgz
+*.DS_Store
 
 # Data files
 data/
