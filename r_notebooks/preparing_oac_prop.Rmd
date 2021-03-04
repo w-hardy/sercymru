@@ -241,7 +241,7 @@ best_model_gp_discrep %>%
   theme(legend.position = "none")
 
 
-oac_monthly_quantity_gp %>% 
+oac_monthly_prop_gp %>% 
   filter(regional_unit %in%
            (best_model_gp_discrep %>%
            filter(prop < .25) %>%
