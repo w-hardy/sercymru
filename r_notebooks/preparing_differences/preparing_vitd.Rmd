@@ -1,5 +1,5 @@
 ---
-title: "Combined contraceptives"
+title: "Respiratory vitdsteroids"
 output: 
   html_document:
     code_folding: hide
@@ -35,12 +35,11 @@ set.seed(32)
 
 ```
 
-
 ## Preparing data
 
-```{r contra-data}
+```{r vitd-data}
 gp <- 
-  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  read_rds("../../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL,
          practice_id = as_factor(practiceid)) %>% 
@@ -48,15 +47,15 @@ gp <-
   janitor::clean_names() %>% 
   select(practice_id, year, npat)
 
-contra <- 
-  read_rds("../data/presdata_updates_040121/presc_wales_contra-combined.rds") %>% 
+vitd <- 
+  read_rds("../../data/presdata_updates_040121/presc_wales_vitamind.rds") %>% 
   janitor::clean_names() %>% 
   mutate(datename = dmy(paste0("28-", datename)),
-         practice_id = as_factor(practice_id))
+         practice_id = as_factor(practiceid))
 
 ## All data sorted into monthly summary
-contra_monthly_count <- 
-  contra %>% 
+vitd_monthly_count <- 
+  vitd %>% 
   group_by(datename) %>% 
   summarise(n = sum(quantity)) %>% 
   mutate(datename = yearmonth(datename),
@@ -76,8 +75,8 @@ contra_monthly_count <-
   as_tsibble(index = datename)
 
 ## Monthly summary by GP
-contra_monthly_quantity_gp <- 
-  countRegional(contra, practice_id, datename, quantity) %>% 
+vitd_monthly_quantity_gp <- 
+  countRegional(vitd, practice_id, datename, quantity) %>% 
   mutate(year = year(datename)) %>%
   as_tibble() %>% 
   inner_join(gp, 
@@ -91,7 +90,7 @@ contra_monthly_quantity_gp <-
 
 ## Identify GPs with missing data 
 gp_missing <- 
-  contra_monthly_quantity_gp %>% 
+  vitd_monthly_quantity_gp %>% 
   as_tibble() %>% 
   pivot_wider(id_cols = regional_unit, names_from = datename,
               values_from = n, values_fill = NA) %>% 
@@ -101,7 +100,7 @@ gp_missing <-
   summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2020 Feb`)),
             miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
   filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-  mutate(miss_10_non_covid = if_else(miss_non_covid > 62/10, TRUE, FALSE))
+  mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
 
 gp_miss_remove <- 
   gp_missing %>% 
@@ -109,30 +108,30 @@ gp_miss_remove <-
   .$regional_unit
 
 ## Remove GPs with missing data in covid months and >10% of non-covid months
-contra_monthly_quantity_gp <- 
-  contra_monthly_quantity_gp %>% 
+vitd_monthly_quantity_gp <- 
+  vitd_monthly_quantity_gp %>% 
   filter(!regional_unit %in% gp_miss_remove)
 
 ## Sort into monthly count data pre-lockdown (March 2020) as training data
-contra_monthly_count_pre_cv19 <- 
-  contra_monthly_count %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+vitd_monthly_count_pre_cv19 <- 
+  vitd_monthly_count %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
-contra_monthly_quantity_gp_pre_cv19 <- 
-  contra_monthly_quantity_gp %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+vitd_monthly_quantity_gp_pre_cv19 <- 
+  vitd_monthly_quantity_gp %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
 ## Replace missing values in training data
-contra_monthly_count_pre_cv19 <- 
-  contra_monthly_count_pre_cv19 %>% 
-  model(mean = MEAN(n)) %>%
-  interpolate(contra_monthly_count_pre_cv19)
+vitd_monthly_count_pre_cv19 <- 
+  vitd_monthly_count_pre_cv19 %>% 
+  model(arima = ARIMA(n)) %>%
+  interpolate(vitd_monthly_count_pre_cv19)
 
-contra_monthly_quantity_gp_pre_cv19 <- 
-  contra_monthly_quantity_gp_pre_cv19%>% 
+vitd_monthly_quantity_gp_pre_cv19 <- 
+  vitd_monthly_quantity_gp_pre_cv19%>% 
   group_by(regional_unit) %>% 
-  model(mean = MEAN(n)) %>% 
-  interpolate(contra_monthly_quantity_gp_pre_cv19)
+  model(arima = ARIMA(n)) %>% 
+  interpolate(vitd_monthly_quantity_gp_pre_cv19)
 
 ```
 
@@ -147,36 +146,36 @@ gp_missing %>%
 
 ## Modelling
 
-```{r, contra-gp-practice-modelling}
+```{r, vitd-gp-practice-modelling}
 plan(cluster)
-system.time(contra_gp_cv_models <-
-  contra_monthly_quantity_gp_pre_cv19 %>%
-                  regionalCV(init = 48, step = 3))
+system.time(vitd_gp_cv_models <-
+  vitd_monthly_quantity_gp_pre_cv19 %>%
+                  regionalCV(init = 36, step = 3))
 plan(sequential)
 
-contra_gp_cv_models %>%
-  saveRDS("../data/contra_gp_cv_models.rds")
+vitd_gp_cv_models %>%
+  saveRDS("../../data/vitd_gp_cv_models.rds")
 
-contra_gp_cv_models <- 
-  read_rds("../data/contra_gp_cv_models.rds")
+vitd_gp_cv_models <- 
+  read_rds("../../data/vitd_gp_cv_models.rds")
 
-contra_gp_cv_models %>% 
+vitd_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
   geom_histogram() +
   xlim(0,100)
 
-contra_gp_cv_models %>% 
+vitd_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   group_by(.model) %>% 
   count() %>% 
   arrange(desc(n))
 
-contra_gp_cv_models %>% 
+vitd_gp_cv_models %>% 
   group_by(regional_unit) %>% 
   ggplot(aes(x = reorder(.model, MAPE, mean), y = MAPE)) + # reorder by mean of y
   geom_boxplot() +
@@ -186,11 +185,11 @@ contra_gp_cv_models %>%
 ```
 
 
-```{r contra-gp-modelling-accuracy}
+```{r vitd-gp-modelling-accuracy}
 best_model_gp <- 
-  contra_gp_cv_models %>% 
+  vitd_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE)
 
 best_mape_over_50 <- 
@@ -201,30 +200,30 @@ best_mape_over_50 <-
 
 * `r nrow(best_mape_over_50)` GPs excluded as MAPE >50%
 
-```{r contra-gp-practice-forecasts}
+```{r vitd-gp-practice-forecasts}
 plan(cluster)
-system.time(contra_gp_fcsts <-
-              contra_monthly_quantity_gp_pre_cv19 %>%
+system.time(vitd_gp_fcsts <-
+              vitd_monthly_quantity_gp_pre_cv19 %>%
               filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
-              regionalJointFcsts(h = "6 months"))
+              regionalJointFcsts(h = "8 months"))
 plan(sequential)
 
-contra_gp_fcsts %>%
-  saveRDS("../data/contra_gp_fcsts.rds")
+vitd_gp_fcsts %>%
+  saveRDS("../../data/vitd_gp_fcsts.rds")
 
-contra_gp_fcsts <- 
-  read_rds("../data/contra_gp_fcsts.rds")
+vitd_gp_fcsts <- 
+  read_rds("../../data/vitd_gp_fcsts.rds")
 
 ```
 
 
 ## Discrepancies
 
-```{r, contra-gp-practice-discrepancies}
+```{r, vitd-gp-practice-discrepancies}
 best_model_gp <- 
-  contra_gp_cv_models %>% 
+  vitd_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   filter(MAPE < 50)
 
@@ -235,10 +234,10 @@ best_model_gp %>%
 best_model_gp_discrep <- 
   best_model_gp %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(contra_gp_fcsts,
+  inner_join(mutate(vitd_gp_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
-  left_join(mutate(select(contra_monthly_quantity_gp, 
+  left_join(mutate(select(vitd_monthly_quantity_gp, 
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
@@ -263,7 +262,7 @@ best_model_gp_discrep %>%
   theme(legend.position = "none")
 
 
-contra_monthly_quantity_gp %>% 
+vitd_monthly_quantity_gp %>% 
   filter(regional_unit %in%
            (best_model_gp_discrep %>%
            filter(prop < .25) %>%
@@ -279,6 +278,6 @@ gp %>%
            unique()))
 
 best_model_gp_discrep %>% 
-  saveRDS("../data/differences/contra_discreps.rds")
+  saveRDS("../../data/differences/vitd_discreps.rds")
 
 ```
