@@ -21,6 +21,7 @@ ANALYSIS:
 TYPE = mixture;
 STARTS = 500 20;
 STITERATIONS = 20;
+LRTSTARTS = 20 5 100 10;
 
 MODEL: 
 %overall%
@@ -29,8 +30,13 @@ i s q| mar@0 apr@1  may@2 jun@3 jul@4;
 i-q@0;
 
   
+SAVEDATA:
+file = oc_discrep_5_class_ml_cprob.txt;
+save = cprob;
+format is free;
+
 OUTPUT:
-TECH1 SAMPSTAT TECH8;
+TECH1 SAMPSTAT TECH8 TECH14;
 
 PLOT:
 TYPE = PLOT1 PLOT2 PlOT3;

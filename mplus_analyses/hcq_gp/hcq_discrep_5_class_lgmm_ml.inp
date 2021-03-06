@@ -1,0 +1,45 @@
+TITLE: hcq discrepancy 5 class lgmm;
+
+DATA: 
+FILE IS ../../data/mplus/hcq_gp_discrep.csv;
+
+
+VARIABLE: 
+NAMES ARE 
+cluster regional_unit mar apr may jun jul;
+
+IDvariable is regional_unit;
+
+USEVARIABLE ARE
+mar-jul;
+
+CLASSES =  c (5);
+
+MISSING ARE ALL (-999);
+
+ANALYSIS:
+TYPE = mixture;
+STARTS = 500 20;
+STITERATIONS = 20;
+LRTSTARTS = 20 5 100 10;
+
+MODEL: 
+%overall%
+
+i s q| mar@0 apr@1  may@2 jun@3 jul@4;
+
+
+  
+SAVEDATA:
+file = hcq_discrep_5_class_ml_cprob.txt;
+save = cprob;
+format is free;
+
+OUTPUT:
+TECH1 SAMPSTAT TECH8 TECH14;
+
+PLOT:
+TYPE = PLOT1 PLOT2 PlOT3;
+SERIES = 
+mar-jul (s);
+
