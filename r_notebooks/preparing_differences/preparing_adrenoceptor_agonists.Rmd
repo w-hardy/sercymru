@@ -1,5 +1,5 @@
 ---
-title: "NSAIDs"
+title: "Adrenoceptor agonists"
 output: 
   html_document:
     code_folding: hide
@@ -37,9 +37,11 @@ set.seed(32)
 
 ## Preparing data
 
-```{r nsaid-data}
+* This data set seems to only have Salbutamol in it
+
+```{r adreno-data}
 gp <- 
-  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  read_rds("../../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL,
          practice_id = as_factor(practiceid)) %>% 
@@ -47,15 +49,14 @@ gp <-
   janitor::clean_names() %>% 
   select(practice_id, year, npat)
 
-nsaid <- 
-  read_rds("../data/presdata_updates_040121/presc_wales_NSAIDs.rds") %>% 
-  janitor::clean_names() %>% 
-  mutate(datename = dmy(paste0("28-", datename)),
-         practice_id = as_factor(practiceid))
+adreno <- 
+  read_rds("../../data/presdata_updates_040121/presc_wales_adrenoceptor-agonists.rds") %>% 
+  mutate(datename = dmy(paste0("28-", datename))) %>% 
+  janitor::clean_names()
 
 ## All data sorted into monthly summary
-nsaid_monthly_count <- 
-  nsaid %>% 
+adreno_monthly_count <- 
+  adreno %>% 
   group_by(datename) %>% 
   summarise(n = sum(quantity)) %>% 
   mutate(datename = yearmonth(datename),
@@ -75,8 +76,8 @@ nsaid_monthly_count <-
   as_tsibble(index = datename)
 
 ## Monthly summary by GP
-nsaid_monthly_quantity_gp <- 
-  countRegional(nsaid, practice_id, datename, quantity) %>% 
+adreno_monthly_quantity_gp <- 
+  countRegional(adreno, practice_id, datename, quantity) %>% 
   mutate(year = year(datename)) %>%
   as_tibble() %>% 
   inner_join(gp, 
@@ -90,7 +91,7 @@ nsaid_monthly_quantity_gp <-
 
 ## Identify GPs with missing data 
 gp_missing <- 
-  nsaid_monthly_quantity_gp %>% 
+  adreno_monthly_quantity_gp %>% 
   as_tibble() %>% 
   pivot_wider(id_cols = regional_unit, names_from = datename,
               values_from = n, values_fill = NA) %>% 
@@ -100,7 +101,7 @@ gp_missing <-
   summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2020 Feb`)),
             miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
   filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-  mutate(miss_10_non_covid = if_else(miss_non_covid > 62/10, TRUE, FALSE))
+  mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
 
 gp_miss_remove <- 
   gp_missing %>% 
@@ -108,30 +109,30 @@ gp_miss_remove <-
   .$regional_unit
 
 ## Remove GPs with missing data in covid months and >10% of non-covid months
-nsaid_monthly_quantity_gp <- 
-  nsaid_monthly_quantity_gp %>% 
+adreno_monthly_quantity_gp <- 
+  adreno_monthly_quantity_gp %>% 
   filter(!regional_unit %in% gp_miss_remove)
 
 ## Sort into monthly count data pre-lockdown (March 2020) as training data
-nsaid_monthly_count_pre_cv19 <- 
-  nsaid_monthly_count %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+adreno_monthly_count_pre_cv19 <- 
+  adreno_monthly_count %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
-nsaid_monthly_quantity_gp_pre_cv19 <- 
-  nsaid_monthly_quantity_gp %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+adreno_monthly_quantity_gp_pre_cv19 <- 
+  adreno_monthly_quantity_gp %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
 ## Replace missing values in training data
-nsaid_monthly_count_pre_cv19 <- 
-  nsaid_monthly_count_pre_cv19 %>% 
-  model(mean = MEAN(n)) %>%
-  interpolate(nsaid_monthly_count_pre_cv19)
+adreno_monthly_count_pre_cv19 <- 
+  adreno_monthly_count_pre_cv19 %>% 
+  model(arima = ARIMA(n)) %>%
+  interpolate(adreno_monthly_count_pre_cv19)
 
-nsaid_monthly_quantity_gp_pre_cv19 <- 
-  nsaid_monthly_quantity_gp_pre_cv19%>% 
+adreno_monthly_quantity_gp_pre_cv19 <- 
+  adreno_monthly_quantity_gp_pre_cv19%>% 
   group_by(regional_unit) %>% 
-  model(mean = MEAN(n)) %>% 
-  interpolate(nsaid_monthly_quantity_gp_pre_cv19)
+  model(arima = ARIMA(n)) %>% 
+  interpolate(adreno_monthly_quantity_gp_pre_cv19)
 
 ```
 
@@ -146,36 +147,36 @@ gp_missing %>%
 
 ## Modelling
 
-```{r, nsaid-gp-practice-modelling}
+```{r, adreno-gp-practice-modelling}
 plan(cluster)
-system.time(nsaid_gp_cv_models <-
-  nsaid_monthly_quantity_gp_pre_cv19 %>%
-                  regionalCV(init = 48, step = 3))
+system.time(adreno_gp_cv_models <-
+  adreno_monthly_quantity_gp_pre_cv19 %>%
+                  regionalCV(init = 36, step = 3))
 plan(sequential)
 
-nsaid_gp_cv_models %>%
-  saveRDS("../data/nsaid_gp_cv_models.rds")
+adreno_gp_cv_models %>%
+  saveRDS("../../data/adreno_gp_cv_models.rds")
 
-nsaid_gp_cv_models <- 
-  read_rds("../data/nsaid_gp_cv_models.rds")
+adreno_gp_cv_models <- 
+  read_rds("../../data/adreno_gp_cv_models.rds")
 
-nsaid_gp_cv_models %>% 
+adreno_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
   geom_histogram() +
   xlim(0,100)
 
-nsaid_gp_cv_models %>% 
+adreno_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   group_by(.model) %>% 
   count() %>% 
   arrange(desc(n))
 
-nsaid_gp_cv_models %>% 
+adreno_gp_cv_models %>% 
   group_by(regional_unit) %>% 
   ggplot(aes(x = reorder(.model, MAPE, mean), y = MAPE)) + # reorder by mean of y
   geom_boxplot() +
@@ -185,11 +186,11 @@ nsaid_gp_cv_models %>%
 ```
 
 
-```{r nsaid-gp-modelling-accuracy}
+```{r adreno-gp-modelling-accuracy}
 best_model_gp <- 
-  nsaid_gp_cv_models %>% 
+  adreno_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE)
 
 best_mape_over_50 <- 
@@ -200,30 +201,30 @@ best_mape_over_50 <-
 
 * `r nrow(best_mape_over_50)` GPs excluded as MAPE >50%
 
-```{r nsaid-gp-practice-forecasts}
+```{r adreno-gp-practice-forecasts}
 plan(cluster)
-system.time(nsaid_gp_fcsts <-
-              nsaid_monthly_quantity_gp_pre_cv19 %>%
+system.time(adreno_gp_fcsts <-
+              adreno_monthly_quantity_gp_pre_cv19 %>%
               filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
-              regionalJointFcsts(h = "6 months"))
+              regionalJointFcsts(h = "8 months"))
 plan(sequential)
 
-nsaid_gp_fcsts %>%
-  saveRDS("../data/nsaid_gp_fcsts.rds")
+adreno_gp_fcsts %>%
+  saveRDS("../../data/adreno_gp_fcsts.rds")
 
-nsaid_gp_fcsts <- 
-  read_rds("../data/nsaid_gp_fcsts.rds")
+adreno_gp_fcsts <- 
+  read_rds("../../data/adreno_gp_fcsts.rds")
 
 ```
 
 
 ## Discrepancies
 
-```{r, nsaid-gp-practice-discrepancies}
+```{r, adreno-gp-practice-discrepancies}
 best_model_gp <- 
-  nsaid_gp_cv_models %>% 
+  adreno_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   filter(MAPE < 50)
 
@@ -234,10 +235,10 @@ best_model_gp %>%
 best_model_gp_discrep <- 
   best_model_gp %>% 
   select(.model, regional_unit) %>% 
-  inner_join(mutate(nsaid_gp_fcsts,
+  inner_join(mutate(adreno_gp_fcsts,
                     datename = yearmonth(datename)), 
              by = c(".model", "regional_unit")) %>%
-  left_join(mutate(select(nsaid_monthly_quantity_gp, 
+  left_join(mutate(select(adreno_monthly_quantity_gp, 
                           c(regional_unit, datename, n)), 
                    datename = yearmonth(datename)),
             by = c("datename", "regional_unit")) %>% 
@@ -262,7 +263,7 @@ best_model_gp_discrep %>%
   theme(legend.position = "none")
 
 
-nsaid_monthly_quantity_gp %>% 
+adreno_monthly_quantity_gp %>% 
   filter(regional_unit %in%
            (best_model_gp_discrep %>%
            filter(prop < .25) %>%
@@ -278,6 +279,7 @@ gp %>%
            unique()))
 
 best_model_gp_discrep %>% 
-  saveRDS("../data/differences/nsaid_discreps.rds")
+  saveRDS("../../data/differences/adreno_discreps.rds")
 
 ```
+

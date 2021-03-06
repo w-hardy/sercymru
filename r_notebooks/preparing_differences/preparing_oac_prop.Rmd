@@ -39,7 +39,7 @@ set.seed(32)
 
 ```{r oac-data}
 gp <- 
-  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  read_rds("../../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL,
          practice_id = as_factor(practiceid)) %>% 
@@ -48,7 +48,7 @@ gp <-
   select(practice_id, year, npat)
 
 oac <- 
-  read_rds("../data/presdata_updates_040121/presc_wales_OAC.rds") %>% 
+  read_rds("../../data/presdata_updates_040121/presc_wales_OAC.rds") %>% 
   janitor::clean_names() %>% 
   mutate(datename = yearmonth(dmy(paste0("28-", datename))),
          practice_id = as_factor(practice_id))
@@ -84,7 +84,7 @@ oac_monthly_prop_gp <-
 
 oac_monthly_prop_gp_pre_cv19 <- 
   oac_monthly_prop_gp %>% 
-  filter(datename < yearmonth("2020 March"))
+  filter(datename < yearmonth(dmy("01-01-2020")))
 
 oac_monthly_prop_gp_pre_cv19 <- 
   oac_monthly_prop_gp_pre_cv19 %>% 
@@ -97,15 +97,15 @@ oac_monthly_prop_gp_pre_cv19 <-
   mutate(datename = yearmonth(datename)) %>% 
   as_tsibble(index = datename, key = regional_unit) %>% 
   group_by(regional_unit) %>% 
-  model(mean = MEAN(n)) %>% 
+  model(arima = ARIMA(n)) %>% 
   interpolate(oac_monthly_prop_gp_pre_cv19) %>% 
-  filter(!regional_unit %in% # Remove those with <62 months data
+  filter(!regional_unit %in% # Remove those with <60 months data
            (oac_monthly_prop_gp_pre_cv19 %>% 
               as_tibble %>% 
               ungroup() %>% 
               group_by(regional_unit) %>% 
               count() %>% 
-              filter(n < 62) %>% 
+              filter(n < 60) %>% 
               .$regional_unit) &
            !regional_unit %in% # Remove bottom 10% GPs by total oac volume 
            (oac %>% 
@@ -130,18 +130,18 @@ oac_monthly_prop_gp_pre_cv19 %>%
 plan(cluster)
 system.time(oac_gp_cv_models <-
   oac_monthly_prop_gp_pre_cv19 %>%
-                  regionalCVBound(init = 48, step = 3))
+                  regionalCVBound(init = 36, step = 3))
 plan(sequential)
 
 oac_gp_cv_models %>%
-  saveRDS("../data/oac_gp_cv_models.rds")
+  saveRDS("../../data/oac_gp_cv_models.rds")
 
 oac_gp_cv_models <- 
-  read_rds("../data/oac_gp_cv_models.rds")
+  read_rds("../../data/oac_gp_cv_models.rds")
 
 oac_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
   geom_histogram() +
@@ -149,7 +149,7 @@ oac_gp_cv_models %>%
 
 oac_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   group_by(.model) %>% 
   count() %>% 
@@ -169,7 +169,7 @@ oac_gp_cv_models %>%
 best_model_gp <- 
   oac_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE)
 
 best_mape_over_50 <- 
@@ -184,14 +184,14 @@ best_mape_over_50 <-
 plan(cluster)
 system.time(oac_gp_fcsts <-
               oac_monthly_prop_gp_pre_cv19 %>%
-              regionalJointFcstsBound(h = "6 months"))
+              regionalJointFcstsBound(h = "8 months"))
 plan(sequential)
 
 oac_gp_fcsts %>%
-  saveRDS("../data/oac_gp_fcsts.rds")
+  saveRDS("../../data/oac_gp_fcsts.rds")
 
 oac_gp_fcsts <- 
-  read_rds("../data/oac_gp_fcsts.rds")
+  read_rds("../../data/oac_gp_fcsts.rds")
 
 ```
 
@@ -202,7 +202,7 @@ oac_gp_fcsts <-
 best_model_gp <- 
   oac_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   filter(MAPE < 50)
 
@@ -257,5 +257,5 @@ gp %>%
            unique()))
 
 best_model_gp_discrep %>% 
-  saveRDS("../data/differences/oac_discreps.rds")
+  saveRDS("../../data/differences/oac_discreps.rds")
 ```

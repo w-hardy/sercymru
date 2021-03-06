@@ -39,7 +39,7 @@ set.seed(32)
 
 ```{r all-prescribing-data}
 gp <- 
-  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  read_rds("../../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL,
          practice_id = as_factor(practiceid)) %>% 
@@ -48,7 +48,7 @@ gp <-
   select(practice_id, year, npat)
 
 all_prescribing <- 
-  read_csv("../data/all_prescribing.csv", col_names = c("n", "datename")) %>% 
+  read_csv("../../data/all_prescribing.csv", col_names = c("n", "datename")) %>% 
   mutate(datename = dmy(paste(28, datename, sep = "-")),
          datename = yearmonth(datename),
          regional_unit = factor("all")) %>% 
@@ -57,7 +57,7 @@ all_prescribing <-
 ## Sort into monthly count data pre-lockdown (March 2020) as training data
 all_prescribing_pre_cv19 <- 
   all_prescribing %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
 ```
 
@@ -71,16 +71,16 @@ all_prescribing_fable_models <-
   all_prescribing_pre_cv19 %>% 
   mutate(datename = yearmonth(datename)) %>%
   fill_gaps() %>%
-  slice(1:(n()-6), .preserve = TRUE) %>%
+  slice(1:(n()-8), .preserve = TRUE) %>%
   stretch_tsibble(.init = 36, .step = 3) %>%
   fableModels() 
 
 all_prescribing_fable_forecasts <- 
-  fable_models %>%
-  forecast(h = 6)
+  all_prescribing_fable_models %>%
+  forecast(h = 8)
 
 all_prescribing_fable_fits <- 
-  fable_forecasts %>% 
+  all_prescribing_fable_forecasts %>% 
   accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
                            rmse_skill = skill_score(RMSE),
                            crps_skill = skill_score(CRPS), ACF1 =ACF1,
@@ -90,10 +90,10 @@ all_prescribing_prophet_fits <-
   all_prescribing_pre_cv19 %>%
   mutate(datename = yearmonth(datename)) %>%
   fill_gaps() %>%
-  slice(1:(n()-6), .preserve = TRUE) %>%
+  slice(1:(n()-8), .preserve = TRUE) %>%
   stretch_tsibble(.init = 36, .step = 3) %>%
   prophetModels() %>%
-  forecast(h = 6) %>%
+  forecast(h = 8) %>%
   accuracy(all_prescribing_pre_cv19, list(RMSE = RMSE, MAE = MAE, MAPE = MAPE,
                            rmse_skill = skill_score(RMSE),
                            crps_skill = skill_score(CRPS), ACF1 =ACF1,
@@ -101,7 +101,7 @@ all_prescribing_prophet_fits <-
 
 all_prescribing_combined_fits <- 
   bind_rows(all_prescribing_fable_fits, all_prescribing_prophet_fits) %>%
-  arrange(RMSE, MAE)
+  rankModels()
 plan(sequential)
 
 
@@ -109,19 +109,19 @@ all_prescribing_cv_models <-
   all_prescribing_combined_fits
 
 all_prescribing_cv_models %>%
-  saveRDS("../data/all_prescribing_cv_models.rds")
+  saveRDS("../../data/all_prescribing_cv_models.rds")
 
 all_prescribing_cv_models <- 
-  read_rds("../data/all_prescribing_cv_models.rds")
+  read_rds("../../data/all_prescribing_cv_models.rds")
 
 all_prescribing_cv_models %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
   geom_histogram()
 
 all_prescribing_cv_models %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   group_by(.model) %>% 
   count() %>% 
@@ -139,7 +139,7 @@ all_prescribing_cv_models %>%
 ```{r all-prescribing-modelling-accuracy}
 best_model <- 
   all_prescribing_cv_models %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE)
 ```
 
@@ -148,14 +148,14 @@ best_model <-
 plan(cluster)
 all_prescribing_fcsts <-
   all_prescribing_pre_cv19 %>%
-  regionalJointFcsts(h = "6 months")
+  regionalJointFcsts(h = "8 months")
 plan(sequential)
 
 all_prescribing_fcsts %>%
-  saveRDS("../data/all_prescribing_fcsts.rds")
+  saveRDS("../../data/all_prescribing_fcsts.rds")
 
 all_prescribing_fcsts <- 
-  read_rds("../data/all_prescribing_fcsts.rds")
+  read_rds("../../data/all_prescribing_fcsts.rds")
 
 ```
 
@@ -208,7 +208,7 @@ best_model_discrep %>%
 
 
 best_model_discrep %>% 
-  saveRDS("../data/differences/all_prescribing_discreps.rds")
+  saveRDS("../../data/differences/all_prescribing_discreps.rds")
 
 fable_forecasts %>% 
   filter(.model == best_model$.model) %>% 

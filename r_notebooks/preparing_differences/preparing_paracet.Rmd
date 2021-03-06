@@ -39,7 +39,7 @@ set.seed(32)
 
 ```{r paracet-data}
 gp <- 
-  read_rds("../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
+  read_rds("../../OneDrive/2_interimdata/8_linkeddata/gp_agesex_qof_combined.rds") %>% 
   mutate(npat = N,
          N = NULL,
          practice_id = as_factor(practiceid)) %>% 
@@ -48,7 +48,7 @@ gp <-
   select(practice_id, year, npat)
 
 paracet <- 
-  read_rds("../data/presdata_updates_040121/presc_wales_paracetamol.rds") %>% 
+  read_rds("../../data/presdata_updates_040121/presc_wales_paracetamol.rds") %>% 
   janitor::clean_names() %>% 
   mutate(datename = dmy(paste0("28-", datename)),
          practice_id = as_factor(practiceid))
@@ -100,7 +100,7 @@ gp_missing <-
   summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2020 Feb`)),
             miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
   filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-  mutate(miss_10_non_covid = if_else(miss_non_covid > 62/10, TRUE, FALSE))
+  mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
 
 gp_miss_remove <- 
   gp_missing %>% 
@@ -115,22 +115,22 @@ paracet_monthly_quantity_gp <-
 ## Sort into monthly count data pre-lockdown (March 2020) as training data
 paracet_monthly_count_pre_cv19 <- 
   paracet_monthly_count %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
 paracet_monthly_quantity_gp_pre_cv19 <- 
   paracet_monthly_quantity_gp %>% 
-  filter(datename < yearmonth(dmy("01-03-2020"))) 
+  filter(datename < yearmonth(dmy("01-01-2020"))) 
 
 ## Replace missing values in training data
 paracet_monthly_count_pre_cv19 <- 
   paracet_monthly_count_pre_cv19 %>% 
-  model(mean = MEAN(n)) %>%
+  model(arima = ARIMA(n)) %>%
   interpolate(paracet_monthly_count_pre_cv19)
 
 paracet_monthly_quantity_gp_pre_cv19 <- 
   paracet_monthly_quantity_gp_pre_cv19%>% 
   group_by(regional_unit) %>% 
-  model(mean = MEAN(n)) %>% 
+  model(arima = ARIMA(n)) %>% 
   interpolate(paracet_monthly_quantity_gp_pre_cv19)
 
 ```
@@ -150,18 +150,18 @@ gp_missing %>%
 plan(cluster)
 system.time(paracet_gp_cv_models <-
   paracet_monthly_quantity_gp_pre_cv19 %>%
-                  regionalCV(init = 48, step = 3))
+                  regionalCV(init = 36, step = 3))
 plan(sequential)
 
 paracet_gp_cv_models %>%
-  saveRDS("../data/paracet_gp_cv_models.rds")
+  saveRDS("../../data/paracet_gp_cv_models.rds")
 
 paracet_gp_cv_models <- 
-  read_rds("../data/paracet_gp_cv_models.rds")
+  read_rds("../../data/paracet_gp_cv_models.rds")
 
 paracet_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   ggplot(aes(x = MAPE)) +
   geom_histogram() +
@@ -169,7 +169,7 @@ paracet_gp_cv_models %>%
 
 paracet_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   group_by(.model) %>% 
   count() %>% 
@@ -189,7 +189,7 @@ paracet_gp_cv_models %>%
 best_model_gp <- 
   paracet_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE)
 
 best_mape_over_50 <- 
@@ -205,14 +205,14 @@ plan(cluster)
 system.time(paracet_gp_fcsts <-
               paracet_monthly_quantity_gp_pre_cv19 %>%
               filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
-              regionalJointFcsts(h = "6 months"))
+              regionalJointFcsts(h = "8 months"))
 plan(sequential)
 
 paracet_gp_fcsts %>%
-  saveRDS("../data/paracet_gp_fcsts.rds")
+  saveRDS("../../data/paracet_gp_fcsts.rds")
 
 paracet_gp_fcsts <- 
-  read_rds("../data/paracet_gp_fcsts.rds")
+  read_rds("../../data/paracet_gp_fcsts.rds")
 
 ```
 
@@ -223,7 +223,7 @@ paracet_gp_fcsts <-
 best_model_gp <- 
   paracet_gp_cv_models %>% 
   group_by(regional_unit) %>% 
-  arrange(RMSE, MAE) %>% 
+  rankModels() %>% 
   slice(1, .preserve = TRUE) %>% 
   filter(MAPE < 50)
 
@@ -278,6 +278,6 @@ gp %>%
            unique()))
 
 best_model_gp_discrep %>% 
-  saveRDS("../data/differences/paracet_discreps.rds")
+  saveRDS("../../data/differences/paracet_discreps.rds")
 
 ```
