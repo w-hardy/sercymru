@@ -10,6 +10,7 @@ serCymruTools/
 *.png
 *.tgz
 *.DS_Store
+*.gh5 # MPlus graphical outputs
 
 # Data files
 data/
