@@ -6,6 +6,7 @@ serCymruTools/
 /OneDrive/4_outputs
 /OneDrive/5_reporting/
 /r_notebooks/*.html
+*.html
 *.sqlite
 *.png
 *.tgz
