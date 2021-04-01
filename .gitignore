@@ -14,7 +14,7 @@ OneDrive/
 *.gh5 # MPlus graphical outputs
 
 # Data files
-data/
+
 
 # History files
 .Rhistory
