@@ -2,9 +2,8 @@
 serCymruTools/
 
 # Non code files
+archive
 OneDrive/
-/OneDrive/4_outputs
-/OneDrive/5_reporting/
 /r_notebooks/*.html
 *.html
 *.sqlite
@@ -14,7 +13,7 @@ OneDrive/
 *.gh5 # MPlus graphical outputs
 
 # Data files
-
+Data/archive
 
 # History files
 .Rhistory
