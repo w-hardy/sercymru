@@ -1,0 +1,268 @@
+---
+title: "`r paste(params$drug, params$iteration)`"
+params: 
+  data: data
+  drug: drug
+  practices: practices
+  iteration: iteration
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    toc_float: true
+---
+
+```{r, setup, message=FALSE}
+## Packages
+# devtools::install_github("https://github.com/w-hardy/serCymruTools")
+library(tidyverse)
+library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(fasster)
+library(furrr)
+library(rebus)
+library(serCymruTools)
+
+## Options
+knitr::opts_chunk$set(cache = FALSE)
+options(mc.cores = parallel::detectCores() - 1)
+
+## Seed
+set.seed(32)
+
+## Params
+
+drug <- params$data %>%
+    str_remove_all("data/prescribing_data/") %>%
+    str_remove_all(".rds")
+practices <- unlist(params$practices)
+data <- params$data
+
+```
+
+## Preparing data
+
+```{r gp-data, message=FALSE}
+gp <- 
+  read_rds("data/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL,
+         practice_id = as.character(practiceid)) %>% 
+  ungroup() %>% 
+  janitor::clean_names() %>% 
+  select(practice_id, year, npat) %>% 
+  filter(practice_id %in% practices)
+
+```
+
+
+```{r, prescribing-data, message=FALSE}
+message(paste0("../../", data))
+
+prescribing <- 
+  read_rds(paste0("../../", data)) %>% 
+  janitor::clean_names() %>% 
+  mutate(datename = dmy(paste0("28-", datename)),
+         practice_id = as.character(practice_id)) %>% 
+  filter(practice_id %in% practices)
+
+## Monthly summary by GP
+prescribing_monthly_quantity_gp <- 
+  countRegional(prescribing, practice_id, datename, quantity) %>% 
+  mutate(year = year(datename)) %>%
+  as_tibble() %>% 
+  inner_join(gp, 
+            by = c("regional_unit" = "practice_id", "year")) %>% 
+  mutate(n = 1000*n/npat,
+         datename = yearmonth(datename),
+         regional_unit = as_factor(regional_unit)) %>% 
+  select(-c(npat, year)) %>% 
+  as_tsibble(index = datename, key = regional_unit) %>% 
+  fill_gaps()
+
+## Identify GPs with missing data 
+months <- c("2015 Jan","2015 Feb","2015 Mar","2015 Apr","2015 May","2015 Jun",
+            "2015 Jul","2015 Aug","2015 Sep","2015 Oct","2015 Nov","2015 Dec",
+            "2016 Jan","2016 Feb","2016 Mar","2016 Apr","2016 May","2016 Jun",
+            "2016 Jul","2016 Aug","2016 Sep","2016 Oct","2016 Nov","2016 Dec",
+            "2017 Jan","2017 Feb","2017 Mar","2017 Apr","2017 May","2017 Jun",
+            "2017 Jul","2017 Aug","2017 Sep","2017 Oct","2017 Nov","2017 Dec",
+            "2018 Jan","2018 Feb","2018 Mar","2018 Apr","2018 May","2018 Jun",
+            "2018 Jul","2018 Aug","2018 Sep","2018 Oct","2018 Nov","2018 Dec",
+            "2019 Jan","2019 Feb","2019 Mar","2019 Apr","2019 May","2019 Jun",
+            "2019 Jul","2019 Aug","2019 Sep","2019 Oct","2019 Nov","2019 Dec",
+            "2020 Jan","2020 Feb","2020 Mar","2020 Apr","2020 May","2020 Jun",
+            "2020 Jul","2020 Aug")
+
+gp_missing <- 
+  prescribing_monthly_quantity_gp %>% 
+  as_tibble() %>% 
+  pivot_wider(id_cols = regional_unit, names_from = datename,
+              values_from = n, values_fill = NA) %>% 
+  select(all_of(months), everything()) %>% 
+  rowwise() %>% 
+  mutate(across(.cols = `2015 Jan`:`2020 Aug`, .fns = is.na)) %>% 
+  group_by(regional_unit) %>% 
+  summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2019 Dec`)),
+            miss_covid = sum(c_across(`2020 Jan`:`2020 Aug`))) %>% 
+  filter(miss_covid > 0 | miss_non_covid > 0) %>% 
+  mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
+
+gp_miss_remove <- 
+  gp_missing %>% 
+  filter(miss_covid > 0 | miss_10_non_covid == TRUE) %>% 
+  .$regional_unit
+
+
+## Remove GPs with missing data in covid months and >10% of non-covid months
+prescribing_monthly_quantity_gp <- 
+  prescribing_monthly_quantity_gp %>% 
+  filter(!regional_unit %in% gp_miss_remove) %>% 
+  group_by(regional_unit)
+
+## Sort into monthly count data pre-lockdown (March 2020) as training data
+
+prescribing_monthly_quantity_gp_pre_cv19 <- 
+  prescribing_monthly_quantity_gp %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) %>% 
+  group_by(regional_unit)
+
+```
+
+
+```{r}
+if (sum(is.na(prescribing_monthly_quantity_gp_pre_cv19$n) > 0)) {
+  ## Replace missing values in training data
+  prescribing_monthly_quantity_gp_pre_cv19 <- 
+    prescribing_monthly_quantity_gp_pre_cv19 %>% 
+    model(arima = ARIMA(log(n))) %>% 
+    interpolate(prescribing_monthly_quantity_gp_pre_cv19)
+}
+```
+
+```{r}
+gp_missing %>% 
+  knitr::kable()
+```
+
+
+* `r length(gp_miss_remove)` GPs removed as they had missing data in the COVID months (Mar-Aug 2020) or >10% missing data pre-covid
+
+
+## Modelling
+
+```{r, prescribing-gp-practice-modelling}
+plan(cluster)
+
+if(str_detect(drug, "oac")){
+system.time(prescribing_gp_cv_models <-
+  prescribing_monthly_quantity_gp_pre_cv19 %>%
+                  regionalCVBound(cv_dist = 8, init = 36, step = 3))  
+} else {
+system.time(prescribing_gp_cv_models <-
+  prescribing_monthly_quantity_gp_pre_cv19 %>%
+                  regionalCV(cv_dist = 8, init = 36, step = 3))
+}
+
+plan(sequential)
+```
+
+```{r}
+if (file.exists(paste0("../../data/gp_cv_models", drug, "_gp_cv_models.rds"))) {
+  read_rds(paste0("../../data/gp_cv_models", drug, "_gp_cv_models.rds")) %>% 
+    bind_rows(prescribing_gp_cv_models) %>% 
+    saveRDS(paste0("../../data/gp_cv_models", drug, "_gp_cv_models.rds"))
+} else {
+  prescribing_gp_cv_models %>%
+    saveRDS(paste0("../../data/gp_cv_models", drug, "_gp_cv_models.rds"))
+}
+```
+
+
+```{r prescribing-gp-modelling-accuracy}
+best_model_gp <- 
+  prescribing_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  rankModels() %>% 
+  slice(1, .preserve = TRUE)
+
+best_mape_over_50 <- 
+  best_model_gp %>% 
+  filter(MAPE > 50)
+
+```
+
+* `r nrow(best_mape_over_50)` GPs excluded as MAPE >50%
+
+
+```{r prescribing-gp-practice-forecasts}
+plan(cluster)
+
+if(str_detect(drug, "oac")){
+system.time(prescribing_gp_fcsts <-
+              prescribing_monthly_quantity_gp_pre_cv19 %>%
+              filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
+              regionalJointFcstsBound())  
+} else {
+system.time(prescribing_gp_fcsts <-
+              prescribing_monthly_quantity_gp_pre_cv19 %>%
+              filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
+              regionalJointFcsts())
+}
+
+plan(sequential)
+
+if (file.exists(paste0("../../data/gp_forecasts", drug, "_gp_fcsts.rds"))) {
+  read_rds(paste0("../../data/gp_forecasts", drug, "_gp_fcsts.rds")) %>% 
+    bind_rows(prescribing_gp_cv_models) %>% 
+    saveRDS(paste0("../../data/gp_forecasts", drug, "_gp_fcsts.rds"))
+} else {
+  prescribing_gp_cv_models %>%
+    saveRDS(paste0("../../data/gp_forecasts", drug, "_gp_fcsts.rds"))
+}
+```
+
+
+## Discrepancies
+
+```{r, prescribing-gp-practice-discrepancies}
+best_model_gp <- 
+  prescribing_gp_cv_models %>% 
+  group_by(regional_unit) %>% 
+  rankModels() %>% 
+  slice(1, .preserve = TRUE) %>% 
+  filter(MAPE < 50)
+
+best_model_gp_discrep <- 
+  best_model_gp %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(prescribing_gp_fcsts,
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(mutate(select(prescribing_monthly_quantity_gp, 
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - med, # observed - forecast
+         prop = n / med) %>% 
+  ungroup()
+
+gp %>% 
+    filter(practice_id %in% 
+           (best_model_gp_discrep %>% 
+           filter(prop <.25) %>% 
+           .$regional_unit %>% 
+           unique()))
+
+
+if (file.exists(paste0("../../data/differences/", drug, "_discreps.rds"))) {
+  read_rds(paste0("../../data/differences/", drug, "_discreps.rds")) %>% 
+    bind_rows(best_model_gp_discrep) %>% 
+    saveRDS(paste0("../../data/differences/", drug, "_discreps.rds"))
+} else {
+  best_model_gp_discrep %>%
+    saveRDS(paste0("../../data/differences/", drug, "_discreps.rds"))
+}
+```
