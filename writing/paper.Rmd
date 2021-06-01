@@ -94,8 +94,10 @@ differences <-
   map_dfr(.x = differences_files,
           .f = ~read_rds(paste0("../data/differences/", .x)),
           .id = "drug") %>% 
-  mutate(drug = relevel(as_factor(drug), ref = "all_drugs"),
-         sd = sd^.25)
+  mutate(drug = case_when(drug == "contra" ~ "oral",
+                          !drug == "contra" ~ drug),
+         drug = relevel(as_factor(drug), ref = "all_drugs"),
+         sd = sd^.25) # Error in serCymruTools when calculated
 
 # GP extract data
 data_files <-
@@ -110,6 +112,7 @@ gp_extract <-
           .id = "drug") 
 ```
 
+
 ```{r, analysis-preferences}
 # Seed for random number generation
 set.seed(32)
@@ -117,19 +120,14 @@ knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE)
 kable_opts <- options(knitr.kable.NA = "-")
 ```
 
-# Introduction
-
-
-# Methods
-
-
-## Data
+## Figure 1
 
 
 ```{r, figure-1, fig.cap="Data processing flow."}
 include_graphics("figures/data_flow.pdf")
 ```
 
+## Table 2
 
 ```{r, table-2}
 read_rds("../data/gp_agesex_qof_combined.rds") %>% 
@@ -148,7 +146,7 @@ read_rds("../data/gp_agesex_qof_combined.rds") %>%
 
 
 
-# Results
+## Figure 2
 
 
 ```{r, figure-2, fig.cap="Distribution of the difference between observed and forecast prescribing, expressed as a percentage of forecast prescribing. Grey line marks forecast level of prescribing. Pink shading covers duration of Wales' \"stay at home\" order. Please note the difference y-axis scales across the plots.", dpi=450}
@@ -202,109 +200,32 @@ differences_quantiles %>%
          width = 10.5)
 
 ```
-
-
 ```{r}
-avg <- function(samples){
-  if (length(samples) >= 1){
-    return(sum(samples) / length(samples))
-  }
-  else{return(NaN)}
-}
-
-sample_SD <- function(samples){
-  # Input is an vector of samples; result is the standard deviation
-  mean = avg(samples)
-  sum_of_squared_deviations <-  0
-  sd <-  0
-  if(length(samples) >= 2){
-    for (datum in samples){
-      sum_of_squared_deviations <- 
-        sum_of_squared_deviations + ((datum - mean) * (datum - mean))
-      sd = sqrt(sum_of_squared_deviations / (length(samples)-1))
-    }
-      return(sd)
-  }
-}
-
-
-set.seed(134)
-vec <- c(rnorm(n = 100), rnorm(n = 100))
-vec_sd <- sd(vec)
-sample_SD(vec)
-compositeSD()
-
-vec
-compositeSD <- function(means, SDs, ncounts){
-  #Calculate combined standard deviation via ANOVA (ANalysis Of VAriance)
-  # See:  http://www.burtonsys.com/climate/composite_standard_deviations.html
-  #    Inputs are:
-  #      means, the array of group means
-  #      SDs, the array of group standard deviations
-  #      ncounts, number of samples in each group (can be scalar
-  #               if all groups have same number of samples)
-  #    Result is the overall standard deviation.
-  G <- length(means) # number of groups
-  if(G != length(SDs)) stop("Inconsistent lengths (means & sds")
-  if(!is.numeric(ncounts)) {(as.numeric(ncounts))}
-  if(G != length(ncounts)) stop("Inconsistent lengths (means & ncounts)")
+differences_quantiles %>%
+  mutate(datename = factor(x = datename, levels = 1:8, 
+                           labels = month.abb[1:8])) %>% 
+  mutate(drug = case_when(drug == "all_drugs" ~ "All",
+                          drug == "ace" ~ "ACE inhibitors",
+                          drug == "adreno" ~ "Adrenoceptor agonists",
+                          drug == "azithro" ~ "Azithromycin",
+                          drug == "contra" ~ "Oral contraceptives",
+                          drug == "cortico" ~ "Corticosteroids",
+                          drug == "hcq" ~ "Hydroxycholoroquine",
+                          drug == "nsaid" ~ "NSAIDs",
+                          drug == "paracet" ~ "Paracetamol",
+                          drug == "ssri" ~ "SSRIs",
+                          drug == "vitd" ~ "Vitamin D",
+                          drug == "warfarin" ~ "Warfarin"),
+         drug = relevel(as_factor(drug), ref = "All")) %>% 
+  filter(drug == "Adrenoceptor agonists" & 
+           datename == "Mar")
   
-  # Calculate total number of samples, N, and grand mean, GM
-  N = sum(ncounts)  # total number of samples
-  if (N <= 1) stop(paste("Warning: only ", N, " samples, SD is incalculable"))
-  GM <-  0.0
-  for (i in 1:G){
-    GM <- GM + means[i] * ncounts[i]
-  }
-  GM <- GM / N  # grand mean
-  
-  # calculate Error Sum of Squares
-  ESS <-  0.0
-  for (i in 1:G){
-    ESS <- ESS + ((SDs[i])**2) * (ncounts[i] - 1)
-  }
-  
-  # calculate Total Group Sum of Squares
-  TGSS <-  0.0
-  for (i in 1:G){
-    TGSS <- TGSS + ((means[i]-GM)**2) * ncounts[i]
-  }
-  
-  # calculate standard deviation as square root of grand variance
-  result <- sqrt((ESS+TGSS)/(N-1))
-  return(result)
-}
-
-samples = 0:9
-print(paste("avg =", avg(samples)))
-sd = sample_SD(samples)
-print(paste("sd =", sd))
-pt1 = c(0,1,2)
-pt2 = c(3,4)
-pt3 = c(5,6,7,8,9)
-means <- c(avg(pt1), avg(pt2), avg(pt3))
-SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
-ncounts <- c(length(pt1), length(pt2), length(pt3))
-sd2 <- compositeSD(means, SDs, ncounts)
-print(paste("sd2 =", sd2))
-
-samples = 0:8
-print(paste("avg =", avg(samples)))
-sd = sample_SD(samples)
-print(paste("sd =", sd))
-pt1 = c(0,1,2)
-pt2 = c(3,4,5)
-pt3 = c(6,7,8)
-means <- c(avg(pt1), avg(pt2), avg(pt3))
-SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
-ncounts <- c(length(pt1), length(pt2), length(pt3))
-sd2 <- compositeSD(means, SDs, ncounts)
-print(paste("sd2 =", sd2))
-
-
 ```
 
-```{python}
+
+## Table 3
+
+```{python, composite-sd-function-py, eval=FALSE}
 
 from __future__ import print_function, division  # requires python 2.6 or later (2.7 or later preferred)
 import math
@@ -406,7 +327,100 @@ print('sd2=', sd2)
 ```
 
 
-```{r, table-3-single-fcts}
+```{r, composite-sd-function-r, echo=FALSE}
+avg <- function(samples){
+  if (length(samples) >= 1){
+    return(sum(samples) / length(samples))
+  }
+  else{return(NaN)}
+}
+
+sample_SD <- function(samples){
+  # Input is an vector of samples; result is the standard deviation
+  mean = avg(samples)
+  sum_of_squared_deviations <-  0
+  sd <-  0
+  if(length(samples) >= 2){
+    for (datum in samples){
+      sum_of_squared_deviations <- 
+        sum_of_squared_deviations + ((datum - mean) * (datum - mean))
+      sd = sqrt(sum_of_squared_deviations / (length(samples)-1))
+    }
+      return(sd)
+  }
+}
+
+compositeSD <- function(means, SDs, ncounts){
+  #Calculate combined standard deviation via ANOVA (ANalysis Of VAriance)
+  # See:  http://www.burtonsys.com/climate/composite_standard_deviations.html
+  #    Inputs are:
+  #      means, the array of group means
+  #      SDs, the array of group standard deviations
+  #      ncounts, number of samples in each group (can be scalar
+  #               if all groups have same number of samples)
+  #    Result is the overall standard deviation.
+  G <- length(means) # number of groups
+  if(G != length(SDs)) stop("Inconsistent lengths (means & sds")
+  if(!is.numeric(ncounts)) {(as.numeric(ncounts))}
+  if(G != length(ncounts)) stop("Inconsistent lengths (means & ncounts)")
+  
+  # Calculate total number of samples, N, and grand mean, GM
+  N = sum(ncounts)  # total number of samples
+  if (N <= 1) stop(paste("Warning: only ", N, " samples, SD is incalculable"))
+  GM <-  0.0
+  for (i in 1:G){
+    GM <- GM + means[i] * ncounts[i]
+  }
+  GM <- GM / N  # grand mean
+  
+  # calculate Error Sum of Squares
+  ESS <-  0.0
+  for (i in 1:G){
+    ESS <- ESS + ((SDs[i])**2) * (ncounts[i] - 1)
+  }
+  
+  # calculate Total Group Sum of Squares
+  TGSS <-  0.0
+  for (i in 1:G){
+    TGSS <- TGSS + ((means[i]-GM)**2) * ncounts[i]
+  }
+  
+  # calculate standard deviation as square root of grand variance
+  result <- sqrt((ESS+TGSS)/(N-1))
+  return(result)
+}
+
+samples = 0:9
+print(paste("avg =", avg(samples)))
+sd = sample_SD(samples)
+print(paste("sd =", sd))
+pt1 = c(0,1,2)
+pt2 = c(3,4)
+pt3 = c(5,6,7,8,9)
+means <- c(avg(pt1), avg(pt2), avg(pt3))
+SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
+ncounts <- c(length(pt1), length(pt2), length(pt3))
+sd2 <- compositeSD(means, SDs, ncounts)
+print(paste("sd2 =", sd2))
+
+samples = 0:8
+print(paste("avg =", avg(samples)))
+sd = sample_SD(samples)
+print(paste("sd =", sd))
+pt1 = c(0,1,2)
+pt2 = c(3,4,5)
+pt3 = c(6,7,8)
+means <- c(avg(pt1), avg(pt2), avg(pt3))
+SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
+ncounts <- c(length(pt1), length(pt2), length(pt3))
+sd2 <- compositeSD(means, SDs, ncounts)
+print(paste("sd2 =", sd2))
+
+
+```
+
+
+```{r, table-3-single-fcts, eval=FALSE}
 nat_data <- 
   data_files %>% 
   map_dfr(read_rds, .id = "drug") %>% 
@@ -462,208 +476,121 @@ best_model_discrep <-
          prop = n / med) %>% 
   ungroup()
 
-
-
-best_model_discrep %>% 
-  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
-  summarise(n = sum(n),
-            sd = compositeSD(.mean, sd, rep(1,nrow(.))),
-            .mean = sum(.mean)
-  ) 
-
-
 best_model_discrep %>% 
   filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
   group_by(regional_unit) %>% 
   summarise(n = sum(n),
-            sd = compositeSD(.mean, sd, rep(1,5)),
-            .mean = sum(.mean),
-            ) %>% 
+            sd = compositeSD(.mean, sd, rep(1, length(sd))),
+            .mean = sum(.mean)) %>% 
   mutate(lb = .mean - 1.96*sd,
          ub = .mean + 1.96*sd,
          lb_mean_pct_change = (100 * (n - ub)/ ub),
          mean_pct_change = (100 * (n - .mean)/ .mean),
-         ub_mean_pct_change = (100 * (n - lb)/ lb),
-         ) %>% 
-  select(regional_unit, lb_mean_pct_change, mean_pct_change, ub_mean_pct_change)
-  ggplot(aes(x = regional_unit, y = mean_pct_change)) +
-  geom_col() +
-  geom_errorbar(aes(ymin = lb_mean_pct_change, ymax = ub_mean_pct_change))
+         ub_mean_pct_change = (100 * (n - lb)/ lb)) %>% 
+  select(regional_unit, lb_mean_pct_change, mean_pct_change, ub_mean_pct_change) %>% 
+  mutate(pct_change = paste0(printnum(mean_pct_change), 
+                             "[", printnum(lb_mean_pct_change), ",", 
+                             printnum(ub_mean_pct_change), "]")) %>% 
+  select(regional_unit, pct_change)
+
+
+best_model_discrep %>% 
+  mutate(prop = 100*(prop-1)) %>% 
+  pivot_wider(id_cols = regional_unit, names_from = datename, values_from = prop) %>% 
+  kable(digits = 2)
 ```
 
 
-
-
-
-
 ```{r, table-3}
-# https://stats.stackexchange.com/questions/454120/how-can-i-calculate-uncertainty-of-the-mean-of-a-set-of-samples-with-different-u
-  
-#
-# An iterative procedure to estimate mean and variance from a set of 
-# measurements `x` made with known measurement errors `sigma.i`.
-#
-var.wt <- function(x, sigma.i, thresh=1e-6, iter.max=1e4) { # Changed from values in example (1e-6, 200)
-  #
-  # To avoid giving undue weight to any subset, all SDs should be nonzero.
-  #
-  if (missing(sigma.i)) sigma.i <- rep(0, length(x)) # No measurement error
-  tol <- sum(abs(x)) * 1e-16
-  sigma.i[sigma.i <= 0] <- min(c(tol, sigma.i[sigma.i > 0])) / 2
-  #
-  # Initialize.
-  #
-  v <- var(x)
-  n <- length(x)
-  S <- mean(sigma.i^2) # Avoids recomputing this constant within the loop
-  for (i in 1:iter.max) {
-    w <- 1/(v + sigma.i^2); w <- w / sum(w)
-    m <- sum(x * w)
-    v.0 <- max(0, sum((x-m)^2 * w) * n / (n-1) - S) 
-    if (v <= v.0 * (1+thresh) && v.0 <= v * (1+thresh)) break
-    v <- v.0
-  }
-  if (i >= iter.max) warning("Maximum iteration count exceeded.")
-  list(Variance=v, Mean=m, Iterations=i)
-}
-
-
-sample_bound <- function(mean = ".mean", variance = "sd", 
-                         bound = c(.975, .5, .025), data = .){
-  
-  # The data in the question.
-  #
-  x <- data[[mean]]
-  sigma.i <- data[[variance]]
-  (s <- var.wt(x, sigma.i))
-  #
-  # A parametric bootstrap.
-  #
-  n <- length(x)
-  sigma <- sqrt(s$Variance)
-  mu <- s$Mean
-  set.seed(17)
-  X <- replicate(5e3, {
-    y <- rnorm(n, mu, sigma)
-    epsilon <- rnorm(n, 0, sigma.i)
-    x <- y + epsilon
-    var.wt(x, sigma.i)
-  })
-  X <- matrix(unlist(X), 3)
-  
-  return(quantile(X[2,], bound))
-}
-
-
 monthly_diffs <- 
   differences %>% 
   select(drug, datename, .mean, sd, n) %>% 
   na.omit() %>% 
   group_by(drug, datename) %>% 
-  group_modify(~ {
-    sample_bound(data = .x) %>% # Estimate the mean and 95% CIs for each month
-      tibble::enframe(name = "bound", value = "value")
-  }) %>% 
-  left_join(differences %>% 
-              select(drug, datename, .mean, sd, n) %>% 
-              na.omit() %>% 
-              group_by(drug, datename) %>% 
-              summarise(n = mean(n, na.rm = TRUE),
-                        .mean = mean(.mean, na.rm = TRUE),
-                        .group = "drop"), 
-            by = c("drug", "datename")) %>% 
-  mutate(p_change = 100*n / value) %>% # Difference as a proportion
-  pivot_wider(id_cols = c("drug", "datename", "n", ".mean"), 
-              names_from = "bound", values_from ="value") %>% 
-  mutate(across(`97.5%`:`2.5%`, .fns = ~(100*n/.x)-100)) %>% # Proportion as percentage change
-  rename("LB" = `97.5%`,
-         "Mean" = `50%`,
-         "UB" = `2.5%`) %>% 
+  summarise(n = sum(n),
+            sd = compositeSD(.mean, sd, rep(nrow(.),length(.mean))),
+            .mean = sum(.mean),
+            .groups = "drop") %>% 
+  mutate(lb = .mean - 1.96*sd,
+         ub = .mean + 1.96*sd,
+         lb_mean_pct_change = (100 * (n - ub)/ ub),
+         mean_pct_change = (100 * (n - .mean)/ .mean),
+         ub_mean_pct_change = (100 * (n - lb)/ lb)) %>% 
   mutate(datename = month(datename),
-         pct_change = paste0(printnum(Mean), 
-                             "[", printnum(LB), ",", printnum(UB), "]"))
+         pct_change = paste0(printnum(mean_pct_change), 
+                             "[", printnum(lb_mean_pct_change), ",", 
+                             printnum(ub_mean_pct_change), "]")) %>% 
+  pivot_wider(id_cols = drug, names_from = datename, values_from = pct_change)
 
-lockdown_diff_bounds <- 
-  differences %>% 
-  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
-  select(drug, datename, .mean, sd, n) %>% 
-  na.omit() %>% 
-  group_by(drug) %>% 
-  group_modify(~ {
-    sample_bound(data = .x) %>% # Estimate the mean and 95% CIs for each month
-      tibble::enframe(name = "bound", value = "value")
-  })
-
-lockdown_diff_bounds_wide <- 
-  lockdown_diff_bounds %>% 
-  pivot_wider(id_cols = "drug", names_from = "bound", values_from = "value") %>% 
-  rename("lb" = `97.5%`,
-         "mean" = `50%`,
-         "ub" = `2.5%`) # returns mean quantity forecast per month in lockdown
-
-
-lockdown_diff_obs <- 
-  differences %>% 
-  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
-  select(drug, datename, .mean, sd, n, med) %>% 
-  na.omit() %>% 
-  group_by(drug) %>% 
-  summarise(n = mean(n, na.rm = FALSE),
-            .mean = mean(.mean, na.rm = FALSE),
-            med_med = median(med),
-            mean_med = mean(med),
-            .groups = "drop")
-
-left_join(lockdown_diff_obs, lockdown_diff_bounds_wide) %>% 
-  mutate(across(.mean:ub, ~(n-.x)/.x))
-
-
-###
 lockdown_diffs <- 
   differences %>% 
   filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
   select(drug, datename, .mean, sd, n) %>% 
   na.omit() %>% 
   group_by(drug) %>% 
-  group_modify(~ {
-    sample_bound(data = .x) %>% # Estimate the mean and 95% CIs for each month
-      tibble::enframe(name = "bound", value = "value")
-  }) %>% 
-  left_join(differences %>% 
-              filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
-              select(drug, datename, .mean, sd, n) %>% 
-              na.omit() %>% 
-              group_by(drug) %>% 
-              summarise(n = mean(n, na.rm = TRUE),
-                        .mean = mean(.mean, na.rm = TRUE),
-                        .groups = "drop"), 
-            by = c("drug")) %>% 
-  mutate(p_change = 100 * n / value) %>% # Difference as a proportion
-  pivot_wider(id_cols = c("drug", "n", ".mean"), 
-              names_from = "bound", values_from ="value") %>% 
-  mutate(across(`97.5%`:`2.5%`, .fns = ~(100*n/.x)-100)) %>% # Proportion as percentage change
-  rename("LB" = `97.5%`,
-         "Mean" = `50%`,
-         "UB" = `2.5%`) %>% 
-    mutate(lockdown = paste0(printnum(Mean), 
-                             "[", printnum(LB), ",", printnum(UB), "]"))
-  
+  summarise(n = sum(n),
+            sd = compositeSD(.mean, sd, rep(1,length(.mean))),
+            .mean = sum(.mean),
+            .groups = "drop") %>% 
+  mutate(lb = .mean - 1.96*sd,
+         ub = .mean + 1.96*sd,
+         lb_mean_pct_change = (100 * (n - ub)/ ub),
+         mean_pct_change = (100 * (n - .mean)/ .mean),
+         ub_mean_pct_change = (100 * (n - lb)/ lb)) %>% 
+  mutate(pct_change = paste0(printnum(mean_pct_change), 
+                             "[", printnum(lb_mean_pct_change), ",", 
+                             printnum(ub_mean_pct_change), "]")) %>% 
+  select(drug, pct_change)
 
-lockdown_diffs %>% 
-  select(drug, lockdown) %>% 
-  left_join(monthly_diffs %>% 
-              pivot_wider(id_cols = "drug", names_from = "datename", 
-                          values_from = "pct_change"), by = "drug") %>% 
+
+left_join(lockdown_diffs, monthly_diffs) %>%
   kable(col.names = c("Drug", "Lockdown", month.abb[1:8]),
         align = "lrrrrrrrrr",
         booktabs = TRUE,
-        caption = "Monthly percentage change in prescribing") %>% 
-  add_header_above(header = c(" " = 1, 
-                              "Mean percentage change [95% CI]" = 9)) %>% 
+        caption = "Monthly percentage change in prescribing") %>%
+  add_header_above(header = c(" " = 1,
+                              "Mean percentage change [95% CI]" = 9)) %>%
   landscape()
 ```
 
-```{r}
+
+```{r, eval=FALSE}
+differences %>% 
+  filter(drug == "adreno" &
+           datename == yearmonth("2020 Mar")) %>% 
+  ggplot(aes(x = prop-1)) +
+  geom_histogram() +
+  geom_vline(aes(xintercept = mean(prop-1)))
+
+
+differences %>% 
+  select(drug, datename, .mean, sd, n) %>% 
+  na.omit() %>% 
+  group_by(drug, datename) %>% 
+  summarise(n = sum(n),
+            sd = compositeSD(.mean, sd, rep(nrow(.),length(.mean))),
+            .mean = sum(.mean),
+            .groups = "drop") %>% 
+  filter(drug == "adreno" &
+           datename == yearmonth("2020 Mar"))
+
+differences %>% 
+  filter(drug == "adreno" &
+           datename == yearmonth("2020 Mar")) %>% 
+  summarise(.mean = sum(.mean),
+            n = sum(n),
+            prop = mean(prop))
+
+differences %>% 
+  filter(drug == "adreno" &
+           datename == yearmonth("2020 Mar")) %>% 
+  mutate(prop_correct = if_else(prop == n/med, TRUE, FALSE))
+```
+
+
+
+
+```{r, eval=FALSE}
 differences %>% 
   filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
   group_by(drug) %>% 
@@ -683,28 +610,18 @@ differences %>%
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 gp_extract %>% 
   filter(str_detect(datename, "-19")) %>% 
   group_by(drug) %>% 
   summarise(n = sum(quantity)/1e6) %>% 
   left_join(lockdown_diffs %>% 
-  select(drug, lockdown), by = "drug")
-```
-
-
-```{r, mean-change-plot}
-monthly_diffs %>% 
-  ggplot(aes(x = datename, group = drug)) +
-  geom_line(aes(y = Mean)) +
-  geom_ribbon(aes(ymin = LB, ymax = UB, fill = drug), alpha = .4) +
-  facet_wrap(~drug, scales = "free")
-
+  select(drug, pct_change), by = "drug")
 ```
 
 
 
-```{r}
+```{r, eval=FALSE}
 differences %>% 
   group_by(drug) %>% 
   summarise(discrepancy = sum(discrepancy, na.rm = TRUE),
@@ -722,533 +639,4 @@ differences %>%
 ```
 
 
-# Discussion
 
-
-\newpage
-
-# References
-
-\begingroup
-\setlength{\parindent}{-0.5in}
-\setlength{\leftskip}{0.5in}
-
-<div id="refs" custom-style="Bibliography"></div>
-\endgroup
-
-\newpage
-
-<div custom-style='Title'>Appendix </div>
-
-\renewcommand{\appendixname}{Supplementary Material}
-\renewcommand{\thefigure}{SI\arabic{figure}} \setcounter{figure}{0}
-\renewcommand{\thetable}{SI\arabic{table}} \setcounter{table}{0}
-\renewcommand{\theequation}{SI\arabic{table}} \setcounter{equation}{0}
-
-# Forecasting
-
-### Forecasting models
-
-* We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
-* We used the `fable` [@R-fable], `fasster` [@R-fasster], and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
-  * Simple methods
-      * Naïve (with and without drift)
-        * $\hat{y}_{T+h|T} = y_T$
-      * Seasonal naïve (with and without drift)
-        * $\hat{y}_{T+h|T} = y_{T-m(k+1)}$ where m = seasonal period and k is the complete years in $T+h$
-  * STL Decomposition model [@Cleveland1990]
-    * Fixed and variable seasonality
-  * Time series linear model
-    * $y_t = \beta_0 + \beta_1x_t + \varepsilon_t$
-  * Autoregressive integrated moving average [ARIMA; @Box2015]
-    * Using a version of the Hyndman-Khandakar algorithm [@Hyndman2008]
-  * Exponential smoothing [@Holt2004; @Winters1960]
-    * Simple exponential smoothing
-    * Holt-Winters Additive Model [@Chatfield1978]
-  * Forecasting with Additive Switching of Seasonality, Trends and Exogenous Regressors [fasster; @R-fasster]
-    * State space model
-  * Prophet [@Taylor2018]
-  * Combination models [cf. @Bates1969; @Clemen1989; @Thomson2019]
-* Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
-* Using Jan 2015 to Dec 2019 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
-  * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to keep run-times manageable)
-    * Only interested in one forecast horizon: six-months
-
-## All prescribing
-
-
-```{r, all-prescribing-model-accuracy-hist1, fig.cap="All prescribing, model accuracy", eval=FALSE}
-p1 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, RMSE, sort), y = RMSE)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90))
-  
-
-p2 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, winkler, sort), y = winkler)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90)) 
-
-cowplot::plot_grid(p1, p2)
-```
-
-
-```{r, all-prescribing-cv-plot, fig.cap="All prescribing, best model CV fit", eval=FALSE}
-all_prescribing_best_cv_model <- 
-  augment(all_prescribing_fable_models) %>% 
-  as_tibble() %>% 
-  filter(.model == all_prescribing_best_model$.model) 
-
-all_prescribing_best_cv_model %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n/1e+06, colour = "Data")) +
-  geom_line(aes(y = .fitted/1e+06, colour = "Fitted", lty = as.factor(.id))) +
-  labs(lty = "CV iteration")
-```
-
-
-```{r, all-prescribing-forecast-plot, warning=FALSE, fig.cap="All prescribing, best model fit and forecast.", eval=FALSE}
-plan(cluster)
-all_prescribing %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n, col = "Observed", fill = "Observed")) +
-  geom_line(aes(y = med, col = "Forecast", fill = "Forecast"), 
-            data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_80, ymax = ub_80, 
-                  fill = "Forecast"), alpha = .2,
-              data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_95, ymax = ub_95, 
-                  fill = "Forecast"), alpha = .3,
-              data = all_prescribing_covid_forecast) +
-  # geom_line(aes(y = fitted, col = "Fitted", fill = "Fitted"), 
-  #           data = fableModels(all_prescribing_pre_cv19) %>% 
-  #             augment() %>% 
-  #             as_tibble() %>% 
-  #             filter(.model == all_prescribing_best_model$.model) %>% 
-  #             group_by(datename) %>% 
-  #             summarise(fitted = median(.fitted, na.rm = TRUE))) +
-  geom_vline(xintercept = ymd("2020-03-01"), lty = 3) +
-  coord_cartesian(xlim = c(dmy("01-11-2018"), dmy("01-08-2020"))) +
-  scale_x_yearmonth(breaks = "6 months", minor_breaks = "1 months")+
-  xlab("Date") +
-  ylab("Mean daily prescribing volume")
-
-plan(sequential)
-```
-
-
-```{r, all-prescribing-pct-change-plot, fig.cap="Percentage difference in all prescribing.", eval=FALSE}
-all_prescribing %>% 
-  inner_join(all_prescribing_covid_forecast, by = "datename") %>% 
-  ggplot(aes(x = datename, y = (100*n/med)-100)) +
-  geom_line() +
-  geom_hline(yintercept = 0, lty = 3)
-```
-
-
-## Excluded practices
-
-Table with a row for each drug and a column for each reason a practice could be excluded, with a total column at the end
-
-(a) missing any data in the COVID months, (b) more than 10% of the pre-COVID data (i.e., 6 months) missing, (c) significant changes to prescribing in the six months pre-COVID (e.g., changes that suggested the practice had closed), or (d) MAPE >50.
-
-```{r, excluded-practices-tab}
-months <- c("2015 Jan","2015 Feb","2015 Mar","2015 Apr","2015 May","2015 Jun",
-            "2015 Jul","2015 Aug","2015 Sep","2015 Oct","2015 Nov","2015 Dec",
-            "2016 Jan","2016 Feb","2016 Mar","2016 Apr","2016 May","2016 Jun",
-            "2016 Jul","2016 Aug","2016 Sep","2016 Oct","2016 Nov","2016 Dec",
-            "2017 Jan","2017 Feb","2017 Mar","2017 Apr","2017 May","2017 Jun",
-            "2017 Jul","2017 Aug","2017 Sep","2017 Oct","2017 Nov","2017 Dec",
-            "2018 Jan","2018 Feb","2018 Mar","2018 Apr","2018 May","2018 Jun",
-            "2018 Jul","2018 Aug","2018 Sep","2018 Oct","2018 Nov","2018 Dec",
-            "2019 Jan","2019 Feb","2019 Mar","2019 Apr","2019 May","2019 Jun",
-            "2019 Jul","2019 Aug","2019 Sep","2019 Oct","2019 Nov","2019 Dec",
-            "2020 Jan","2020 Feb","2020 Mar","2020 Apr","2020 May","2020 Jun",
-            "2020 Jul","2020 Aug")
-
-monthlyPrescribing <- 
-  function(data){
-    data %>% 
-      janitor::clean_names() %>% 
-      mutate(datename = dmy(paste0("28-", datename)),
-             practice_id = as.character(practice_id)) %>% 
-      countRegional(practice_id, datename, quantity) %>% 
-      mutate(year = year(datename)) %>%
-      as_tibble() %>% 
-      inner_join(gp, 
-                 by = c("regional_unit" = "practice_id", "year")) %>% 
-      mutate(n = 1000*n/npat,
-             datename = yearmonth(datename),
-             regional_unit = as_factor(regional_unit)) %>% 
-      select(-c(npat, year)) %>% 
-      as_tsibble(index = datename, key = regional_unit) %>% 
-      fill_gaps()
-  }
-
-gpMissing <- 
-  function(data){
-    data %>% 
-      as_tibble() %>% 
-      pivot_wider(id_cols = regional_unit, names_from = datename,
-                  values_from = n, values_fill = NA) %>% 
-      select(all_of(months), everything()) %>% 
-      rowwise() %>% 
-      mutate(across(.cols = `2015 Jan`:`2020 Aug`, .fns = is.na)) %>% 
-      group_by(regional_unit) %>% 
-      summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2019 Dec`)),
-                miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
-      filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-      mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
-  }
-
-missRemove <- 
-  function(data){
-    data %>% 
-      mutate(remove = if_else((miss_covid > 0 | miss_10_non_covid == TRUE), TRUE, FALSE)) %>% 
-      summarise(miss_covid = sum(if_else(miss_covid > 0, TRUE, FALSE)),
-                miss_10_non_covid = sum(if_else(miss_non_covid > 60/10, TRUE, FALSE)),
-                miss_either = sum(if_else(remove == TRUE, TRUE, FALSE)))
-  }
-
-n_practices <- 
-  data_files %>% 
-  map(read_rds) %>% 
-  map(pluck("practice_id")) %>% 
-  map(unique) %>% 
-  map_dfr(length) %>% 
-  pivot_longer(cols = everything(), names_to = "drug", values_to = "n")
-
-missing_raw_data <- 
-  data_files %>% 
-  map(read_rds) %>% 
-  map(monthlyPrescribing) %>% 
-  map(gpMissing) %>% 
-  map_dfr(missRemove, .id = "drug")
-
-poor_forcasts <- 
-  cv_model_files %>% 
-  map_dfr(.id = "drug", .f = read_rds) %>% 
-  rankModels() %>% 
-  group_by(drug, regional_unit) %>% 
-  slice(1, .preserve = TRUE) %>% 
-  filter(MAPE >= 50) %>% 
-  group_by(drug) %>% 
-  summarise(mape_over_50 = n())
-
-n_practices %>% 
-  left_join(missing_raw_data, by = "drug") %>% 
-  left_join(poor_forcasts, by = "drug") %>% 
-  rowwise() %>% 
-  mutate(mape_over_50 = if_else(is.na(mape_over_50), as.integer(0), mape_over_50),
-         total_removed = miss_either + mape_over_50) %>% 
-  knitr::kable(booktabs = TRUE, linesep = "",
-               caption = "Summary of GP practices removed for each drug.") %>% 
-  footnote(general = "The total is not always equal to the row sum, as a single practice may be missing both data in covid months and more than 10\\% of data in the non-covid months, but will only be excluded once.",
-           threeparttable = TRUE)
-
-n_practices %>% 
-  summarise(sum(n))
-
-length(unique(gp$practice_id))
-```
-
-
-\renewcommand{\appendixname}{Supplementary Material}
-\renewcommand{\thefigure}{SI\arabic{figure}} \setcounter{figure}{0}
-\renewcommand{\thetable}{SI\arabic{table}} \setcounter{table}{0}
-\renewcommand{\theequation}{SI\arabic{table}} \setcounter{equation}{0}
-
-# Forecasting
-
-### Forecasting models
-
-* We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
-* We used the `fable` [@R-fable], `fasster` [@R-fasster], and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
-  * Simple methods
-      * Naïve (with and without drift)
-        * $\hat{y}_{T+h|T} = y_T$
-      * Seasonal naïve (with and without drift)
-        * $\hat{y}_{T+h|T} = y_{T-m(k+1)}$ where m = seasonal period and k is the complete years in $T+h$
-  * STL Decomposition model [@Cleveland1990]
-    * Fixed and variable seasonality
-  * Time series linear model
-    * $y_t = \beta_0 + \beta_1x_t + \varepsilon_t$
-  * Autoregressive integrated moving average [ARIMA; @Box2015]
-    * Using a version of the Hyndman-Khandakar algorithm [@Hyndman2008]
-  * Exponential smoothing [@Holt2004; @Winters1960]
-    * Simple exponential smoothing
-    * Holt-Winters Additive Model [@Chatfield1978]
-  * Forecasting with Additive Switching of Seasonality, Trends and Exogenous Regressors [fasster; @R-fasster]
-    * State space model
-  * Prophet [@Taylor2018]
-  * Combination models [cf. @Bates1969; @Clemen1989; @Thomson2019]
-* Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
-* Using Jan 2015 to Dec 2019 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
-  * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to keep run-times manageable)
-    * Only interested in one forecast horizon: six-months
-
-## All prescribing
-
-
-```{r, all-prescribing-model-accuracy-hist, fig.cap="All prescribing, model accuracy", eval=FALSE}
-p1 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, RMSE, sort), y = RMSE)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90))
-  
-
-p2 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, winkler, sort), y = winkler)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90)) 
-
-cowplot::plot_grid(p1, p2)
-```
-
-
-```{r, all-prescribing-cv-plot1, fig.cap="All prescribing, best model CV fit", eval=FALSE}
-all_prescribing_best_cv_model <- 
-  augment(all_prescribing_fable_models) %>% 
-  as_tibble() %>% 
-  filter(.model == all_prescribing_best_model$.model) 
-
-all_prescribing_best_cv_model %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n/1e+06, colour = "Data")) +
-  geom_line(aes(y = .fitted/1e+06, colour = "Fitted", lty = as.factor(.id))) +
-  labs(lty = "CV iteration")
-```
-
-
-```{r, all-prescribing-forecast-plot1, warning=FALSE, fig.cap="All prescribing, best model fit and forecast.", eval=FALSE}
-plan(cluster)
-all_prescribing %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n, col = "Observed", fill = "Observed")) +
-  geom_line(aes(y = med, col = "Forecast", fill = "Forecast"), 
-            data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_80, ymax = ub_80, 
-                  fill = "Forecast"), alpha = .2,
-              data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_95, ymax = ub_95, 
-                  fill = "Forecast"), alpha = .3,
-              data = all_prescribing_covid_forecast) +
-  # geom_line(aes(y = fitted, col = "Fitted", fill = "Fitted"), 
-  #           data = fableModels(all_prescribing_pre_cv19) %>% 
-  #             augment() %>% 
-  #             as_tibble() %>% 
-  #             filter(.model == all_prescribing_best_model$.model) %>% 
-  #             group_by(datename) %>% 
-  #             summarise(fitted = median(.fitted, na.rm = TRUE))) +
-  geom_vline(xintercept = ymd("2020-03-01"), lty = 3) +
-  coord_cartesian(xlim = c(dmy("01-11-2018"), dmy("01-08-2020"))) +
-  scale_x_yearmonth(breaks = "6 months", minor_breaks = "1 months")+
-  xlab("Date") +
-  ylab("Mean daily prescribing volume")
-
-plan(sequential)
-```
-
-
-```{r, all-prescribing-pct-change-plot1, fig.cap="Percentage difference in all prescribing.", eval=FALSE}
-all_prescribing %>% 
-  inner_join(all_prescribing_covid_forecast, by = "datename") %>% 
-  ggplot(aes(x = datename, y = (100*n/med)-100)) +
-  geom_line() +
-  geom_hline(yintercept = 0, lty = 3)
-```
-
-
-## Excluded practices
-
-Table with a row for each drug and a column for each reason a practice could be excluded, with a total column at the end
-
-(a) missing any data in the COVID months, (b) more than 10% of the pre-COVID data (i.e., 6 months) missing, (c) significant changes to prescribing in the six months pre-COVID (e.g., changes that suggested the practice had closed), or (d) MAPE >50.
-
-```{r, excluded-practices-tab1}
-months <- c("2015 Jan","2015 Feb","2015 Mar","2015 Apr","2015 May","2015 Jun",
-            "2015 Jul","2015 Aug","2015 Sep","2015 Oct","2015 Nov","2015 Dec",
-            "2016 Jan","2016 Feb","2016 Mar","2016 Apr","2016 May","2016 Jun",
-            "2016 Jul","2016 Aug","2016 Sep","2016 Oct","2016 Nov","2016 Dec",
-            "2017 Jan","2017 Feb","2017 Mar","2017 Apr","2017 May","2017 Jun",
-            "2017 Jul","2017 Aug","2017 Sep","2017 Oct","2017 Nov","2017 Dec",
-            "2018 Jan","2018 Feb","2018 Mar","2018 Apr","2018 May","2018 Jun",
-            "2018 Jul","2018 Aug","2018 Sep","2018 Oct","2018 Nov","2018 Dec",
-            "2019 Jan","2019 Feb","2019 Mar","2019 Apr","2019 May","2019 Jun",
-            "2019 Jul","2019 Aug","2019 Sep","2019 Oct","2019 Nov","2019 Dec",
-            "2020 Jan","2020 Feb","2020 Mar","2020 Apr","2020 May","2020 Jun",
-            "2020 Jul","2020 Aug")
-
-monthlyPrescribing <- 
-  function(data){
-    data %>% 
-      janitor::clean_names() %>% 
-      mutate(datename = dmy(paste0("28-", datename)),
-             practice_id = as.character(practice_id)) %>% 
-      countRegional(practice_id, datename, quantity) %>% 
-      mutate(year = year(datename)) %>%
-      as_tibble() %>% 
-      inner_join(gp, 
-                 by = c("regional_unit" = "practice_id", "year")) %>% 
-      mutate(n = 1000*n/npat,
-             datename = yearmonth(datename),
-             regional_unit = as_factor(regional_unit)) %>% 
-      select(-c(npat, year)) %>% 
-      as_tsibble(index = datename, key = regional_unit) %>% 
-      fill_gaps()
-  }
-
-gpMissing <- 
-  function(data){
-    data %>% 
-      as_tibble() %>% 
-      pivot_wider(id_cols = regional_unit, names_from = datename,
-                  values_from = n, values_fill = NA) %>% 
-      select(all_of(months), everything()) %>% 
-      rowwise() %>% 
-      mutate(across(.cols = `2015 Jan`:`2020 Aug`, .fns = is.na)) %>% 
-      group_by(regional_unit) %>% 
-      summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2019 Dec`)),
-                miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
-      filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-      mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
-  }
-
-missRemove <- 
-  function(data){
-    data %>% 
-      mutate(remove = if_else((miss_covid > 0 | miss_10_non_covid == TRUE), TRUE, FALSE)) %>% 
-      summarise(miss_covid = sum(if_else(miss_covid > 0, TRUE, FALSE)),
-                miss_10_non_covid = sum(if_else(miss_non_covid > 60/10, TRUE, FALSE)),
-                miss_either = sum(if_else(remove == TRUE, TRUE, FALSE)))
-  }
-
-n_practices <- 
-  data_files %>% 
-  map(read_rds) %>% 
-  map(pluck("practice_id")) %>% 
-  map(unique) %>% 
-  map_dfr(length) %>% 
-  pivot_longer(cols = everything(), names_to = "drug", values_to = "n")
-
-missing_raw_data <- 
-  data_files %>% 
-  map(read_rds) %>% 
-  map(monthlyPrescribing) %>% 
-  map(gpMissing) %>% 
-  map_dfr(missRemove, .id = "drug")
-
-poor_forcasts <- 
-  cv_model_files %>% 
-  map_dfr(.id = "drug", .f = read_rds) %>% 
-  rankModels() %>% 
-  group_by(drug, regional_unit) %>% 
-  slice(1, .preserve = TRUE) %>% 
-  filter(MAPE >= 50) %>% 
-  group_by(drug) %>% 
-  summarise(mape_over_50 = n())
-
-n_practices %>% 
-  left_join(missing_raw_data, by = "drug") %>% 
-  left_join(poor_forcasts, by = "drug") %>% 
-  rowwise() %>% 
-  mutate(mape_over_50 = if_else(is.na(mape_over_50), as.integer(0), mape_over_50),
-         total_removed = miss_either + mape_over_50) %>% 
-  knitr::kable(booktabs = TRUE, linesep = "",
-               caption = "Summary of GP practices removed for each drug.") %>% 
-  footnote(general = "The total is not always equal to the row sum, as a single practice may be missing both data in covid months and more than 10\\% of data in the non-covid months, but will only be excluded once.",
-           threeparttable = TRUE)
-
-n_practices %>% 
-  summarise(sum(n))
-
-length(unique(gp$practice_id))
-```
-
-
-## Cross-validated model accuracy
-
-```{r, cv-model-accuracy-by-drug-tab}
-cv_model_files %>% 
-  map_dfr(.id = "drug", .f = read_rds) %>% 
-  rankModels() %>% 
-  group_by(drug, regional_unit) %>% 
-  slice(1, .preserve = TRUE) %>% 
-  filter(MAPE < 50) %>% 
-  group_by(drug) %>% 
-  summarise(n_practice_retained = n(),
-            mape_mean = mean(MAPE),
-            mape_sd = sd(MAPE)) %>% 
-  kable(caption = "Accuaracy of cross-validated models retained for forecasting.",
-               digits = 2)
-```
-
-
-```{r, individual-drug-accuracy-plot, fig.cap="Accuracy of best model for each regional unit by drug, as measured by mean absoloute percentage error (MAPE). Models with MAPE > 50 have been removed."}
-cv_model_files %>% 
-  map_dfr(.id = "drug", .f = read_rds) %>% 
-  rankModels() %>% 
-  group_by(drug, regional_unit) %>% 
-  slice(1, .preserve = TRUE) %>% 
-  filter(MAPE < 50) %>% 
-  mutate(drug = as.factor(drug),
-         drug = relevel(as_factor(drug), ref = "all_drugs")) %>% 
-  ggplot(aes(x = drug, y = MAPE, col = drug)) +
-  geom_violin() +
-  geom_jitter(alpha = .1) +
-  xlab("Medicine group")+
-  theme(legend.position = "none")
-```
-
-
-```{r best-cv-model-type, fig.cap="Performance by model type."}
-cv_model_files %>% 
-  map_dfr(.id = "drug", .f = read_rds) %>% 
-  rankModels() %>% 
-  group_by(drug, regional_unit) %>% 
-  slice(1, .preserve = TRUE) %>% 
-  filter(MAPE < 50) %>% 
-  ggplot(aes(x = as.factor(.model))) +
-  geom_bar() +
-  xlab("Model") +
-  theme(axis.text.x = element_text(angle = 90))
-```
-
-
-## Warfarin
-
-```{r, oac-gen-trend, eval = FALSE}
-oac <- read_rds(data_files[9])
-
-oac %>% 
-  mutate(warfarin = if_else(bnfchem == "0208020V0", TRUE, FALSE)) %>% 
-  group_by(warfarin, datename) %>% 
-  summarise(quantity = sum(quantity), .groups = "drop") %>% 
-  pivot_wider(id_cols = datename, values_from = quantity, names_from = warfarin) %>% 
-  mutate(prop = `TRUE` / (`TRUE` + `FALSE`),
-         datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
-  tsibble() %>% 
-  autoplot(prop) +
-  xlab("Date") +
-  ylab("Warfarin as a proportion of all oral anticoagulant prescribing")
-
-```
-
-
-
-\newpage
-
-## SM References
-
-\begingroup
-\setlength{\parindent}{-0.5in}
-\setlength{\leftskip}{0.5in}
-
-<div id="refs" custom-style="Bibliography"></div>
-\endgroup
-
-\newpage

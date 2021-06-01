@@ -1,8 +1,11 @@
 ---
-title: Supplementary Information
+title: "Supplementary Information"
 short_title: COVID-19 Prescribing
-bibliography      : ["r-references.bib", "../references/library.bib"]
-ouput: html_document
+bibliography:
+- r-references.bib
+- ../references/library.bib
+output: pdf_document
+ouput: pdf_document
 ---
 
 ```{r setup, include = FALSE}
@@ -26,7 +29,6 @@ library(geepack)
 library(papaja)
 
 r_refs("r-references.bib")
-
 
 ## Data
 gp <- 
@@ -65,12 +67,10 @@ differences <-
           .id = "drug") %>% 
   mutate(drug = relevel(as_factor(drug), ref = "all_drugs"))
 
-```
 
-```{r, analysis-preferences}
 # Seed for random number generation
 set.seed(32)
-knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE, echo = FALSE)
 kable_opts <- options(knitr.kable.NA = "-")
 ```
 
@@ -83,20 +83,20 @@ kable_opts <- options(knitr.kable.NA = "-")
 
 ## Reproducability and code
 
-
 We used `r cite_r("r-references.bib")` for all our analyses, functions are available in the `serCymruTools` package [@R-serCymruTools], and all other code is available at https://github.com/w-hardy/sercymru.
+
 
 ## Forecasting
 
 ### Forecasting models
 
 * We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
-* We used the `fable` [@R-fable], `fasster` [@R-fasster], and the `fable.prophet` [@R-fable.prophet] packages to conduct the time series analyses.
+* We used the `fable` [@R-fable] and `fasster` [@R-fasster] packages to conduct the time series analyses.
   * Simple methods
       * Naïve (with and without drift)
         * $\hat{y}_{T+h|T} = y_T$
       * Seasonal naïve (with and without drift)
-        * $\hat{y}_{T+h|T} = y_{T-m(k+1)}$ where m = seasonal period and k is the complete years in $T+h$
+        * $\hat{y}_{T+h|T} = y_{T-m(k+1)}$ where $m$ = seasonal period and $k$ is the complete years in $T+h$
   * STL Decomposition model [@Cleveland1990]
     * Fixed and variable seasonality
   * Time series linear model
@@ -108,86 +108,11 @@ We used `r cite_r("r-references.bib")` for all our analyses, functions are avail
     * Holt-Winters Additive Model [@Chatfield1978]
   * Forecasting with Additive Switching of Seasonality, Trends and Exogenous Regressors [fasster; @R-fasster]
     * State space model
-  * Prophet [@Taylor2018]
-  * Combination models [cf. @Bates1969; @Clemen1989; @Thomson2019]
-* Prescribing quantities log transformed and forecasts use median values to reduce bias that back transformation would introduce when using the mean
-* Using Jan 2015 to Dec 2019 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
+  * Combination models [cf. @Clemen1989; @Thomson2019]
+* Prescribing quantities were log transformed and the forecasts use median estimates of prescribing to reduce bias that back transformation would introduce when using the mean
+* Using January 2015 to December 2019 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
   * Started with 36 months of data, used 6-month horizon as this was the horizon we would be using for the forecasts, 3-month step (to keep run-times manageable)
     * Only interested in one forecast horizon: six-months
-
-
-## All prescribing
-
-
-```{r, all-prescribing-model-accuracy-hist, fig.cap="All prescribing, model accuracy", eval=FALSE}
-p1 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, RMSE, sort), y = RMSE)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90))
-  
-
-p2 <- all_prescribing_fable_fits %>% 
-  na.omit() %>% 
-  ggplot(aes(x = reorder(.model, winkler, sort), y = winkler)) +
-  geom_col() +
-  theme(axis.text.x = element_text(angle = 90)) 
-
-cowplot::plot_grid(p1, p2)
-```
-
-
-```{r, all-prescribing-cv-plot, fig.cap="All prescribing, best model CV fit", eval=FALSE}
-all_prescribing_best_cv_model <- 
-  augment(all_prescribing_fable_models) %>% 
-  as_tibble() %>% 
-  filter(.model == all_prescribing_best_model$.model) 
-
-all_prescribing_best_cv_model %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n/1e+06, colour = "Data")) +
-  geom_line(aes(y = .fitted/1e+06, colour = "Fitted", lty = as.factor(.id))) +
-  labs(lty = "CV iteration")
-```
-
-
-```{r, all-prescribing-forecast-plot, warning=FALSE, fig.cap="All prescribing, best model fit and forecast.", eval=FALSE}
-plan(cluster)
-all_prescribing %>% 
-  ggplot(aes(x = datename)) +
-  geom_line(aes(y = n, col = "Observed", fill = "Observed")) +
-  geom_line(aes(y = med, col = "Forecast", fill = "Forecast"), 
-            data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_80, ymax = ub_80, 
-                  fill = "Forecast"), alpha = .2,
-              data = all_prescribing_covid_forecast) +
-  geom_ribbon(aes(ymin = lb_95, ymax = ub_95, 
-                  fill = "Forecast"), alpha = .3,
-              data = all_prescribing_covid_forecast) +
-  # geom_line(aes(y = fitted, col = "Fitted", fill = "Fitted"), 
-  #           data = fableModels(all_prescribing_pre_cv19) %>% 
-  #             augment() %>% 
-  #             as_tibble() %>% 
-  #             filter(.model == all_prescribing_best_model$.model) %>% 
-  #             group_by(datename) %>% 
-  #             summarise(fitted = median(.fitted, na.rm = TRUE))) +
-  geom_vline(xintercept = ymd("2020-03-01"), lty = 3) +
-  coord_cartesian(xlim = c(dmy("01-11-2018"), dmy("01-08-2020"))) +
-  scale_x_yearmonth(breaks = "6 months", minor_breaks = "1 months")+
-  xlab("Date") +
-  ylab("Mean daily prescribing volume")
-
-plan(sequential)
-```
-
-
-```{r, all-prescribing-pct-change-plot, fig.cap="Percentage difference in all prescribing.", eval=FALSE}
-all_prescribing %>% 
-  inner_join(all_prescribing_covid_forecast, by = "datename") %>% 
-  ggplot(aes(x = datename, y = (100*n/med)-100)) +
-  geom_line() +
-  geom_hline(yintercept = 0, lty = 3)
-```
 
 
 ## Excluded practices
@@ -195,6 +120,7 @@ all_prescribing %>%
 Table with a row for each drug and a column for each reason a practice could be excluded, with a total column at the end
 
 (a) missing any data in the COVID months, (b) more than 10% of the pre-COVID data (i.e., 6 months) missing, (c) significant changes to prescribing in the six months pre-COVID (e.g., changes that suggested the practice had closed), or (d) MAPE >50.
+
 
 ```{r, excluded-practices-tab}
 months <- c("2015 Jan","2015 Feb","2015 Mar","2015 Apr","2015 May","2015 Jun",
@@ -289,17 +215,12 @@ n_practices %>%
                caption = "Summary of GP practices removed for each drug.") %>% 
   footnote(general = "The total is not always equal to the row sum, as a single practice may be missing both data in covid months and more than 10\\% of data in the non-covid months, but will only be excluded once.",
            threeparttable = TRUE)
-
-n_practices %>% 
-  summarise(sum(n))
-
-length(unique(gp$practice_id))
 ```
 
 
 ## Cross-validated model accuracy
 
-```{r, cv-model-accuracy-by-drug-tab}
+```{r, cv-model-accuracy-by-drug-tab, eval=FALSE}
 cv_model_files %>% 
   map_dfr(.id = "drug", .f = read_rds) %>% 
   rankModels() %>% 
@@ -347,8 +268,8 @@ cv_model_files %>%
 
 ## Warfarin
 
-```{r, oac-gen-trend, eval=FALSE}
-oac <- read_rds(data_files[9])
+```{r, oac-gen-trend, fig.cap="Warfarin as a percentage of all oral anticoagulant prescribing in Wales. Pink shading covers duration of Wales' \"stay at home\" order."}
+oac <- read_rds(data_files[12])
 
 oac %>% 
   mutate(warfarin = if_else(bnfchem == "0208020V0", TRUE, FALSE)) %>% 
@@ -357,8 +278,13 @@ oac %>%
   pivot_wider(id_cols = datename, values_from = quantity, names_from = warfarin) %>% 
   mutate(prop = `TRUE` / (`TRUE` + `FALSE`),
          datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
-  tsibble() %>% 
-  autoplot(prop) +
+  tsibble(index = datename) %>% 
+  ggplot(aes(x = datename)) + 
+  geom_line(aes(y = prop))+
+  geom_vline(aes(xintercept = dmy("01-03-2020")), lty = 2, col = "red") +
+  geom_rect(aes(xmin = dmy("01-03-2020"), xmax = dmy("31-07-2020"), 
+                ymin = -Inf, ymax = Inf),
+            fill = 'pink', col = 0,alpha = 0.03) +
   xlab("Date") +
   ylab("Warfarin as a proportion of all oral anticoagulant prescribing")
 
