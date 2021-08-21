@@ -4,12 +4,14 @@ serCymruTools/
 # Non code files
 archive
 OneDrive/
+htai/
+writing/
 /r_notebooks/*.html
 *.html
 *.sqlite
 *.png
 *.tgz
-*.DS_Store
+.DS_Store
 *.gh5 # MPlus graphical outputs
 
 # Data files
@@ -50,6 +52,7 @@ r_notebooks/*.html
 # knitr and R markdown default cache directories
 *_cache/
 /cache/
+/paper_files
 
 # Temporary files created by R markdown
 *.utf8.md
