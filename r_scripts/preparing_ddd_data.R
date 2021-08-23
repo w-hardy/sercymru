@@ -8,6 +8,7 @@ data_files <-
   paste0("data/prescribing_data/", list.files("data/prescribing_data"))
 names(data_files) <-
   str_remove_all(list.files("data/prescribing_data"), ".rds")
+data_files <- data_files[!str_detect(data_files,"ddd_")]
 
 pres_data <-
   map_dfr(.x = data_files,
@@ -32,7 +33,7 @@ ddd_pres_data <-
   left_join(ddd_data, by = "bnf_chem") %>%
   mutate(strength1 = str_remove_all(bnf_name, SPACE),
          strength = case_when(
-           drug == "oral_contra" ~ "1d",
+           drug == "ddd_oral_contra" ~ "1d",
            strength1 == "arthrotec50_tab" ~ "50mg", # https://www.medicines.org.uk/emc/product/6678/smpc
            strength1 == "arthrotec75_tab" ~ "75mg", # https://www.medicines.org.uk/emc/product/1144/smpc
            strength1 == "nurofenplus_tab" ~ "200mg", # https://www.medicines.org.uk/emc/product/5627/smpc
@@ -80,7 +81,7 @@ ddd_pres_data <-
                               quantity == items,  items*50, quantity), # When looking at the records for the titration packs to establish their strength, it appears that the quantity has been incorrectly reported for many cases as the number of items.
          ddd_n = case_when(
            strength_unit == "d" ~ quantity * strength_value,
-           strength_unit == "u" & drug == "vitd" ~
+           strength_unit == "u" & drug == "ddd_vitd" ~
              quantity * (strength_value/40),
            ddd_unit == "unit" ~ quantity / ddd_value,
            strength_unit == "mcg" & ddd_unit == "mg" ~
@@ -93,4 +94,3 @@ ddd_pres_data <-
 map(.x = unique(ddd_pres_data$drug),
     .f = ~saveRDS(filter(ddd_pres_data, drug == .x),
                   paste0("data/prescribing_data/", .x, ".rds")))
-
