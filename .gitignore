@@ -6,6 +6,8 @@ archive
 OneDrive/
 htai/
 writing/
+!writing/paper.Rmd
+!writing/appendix_a.Rmd
 /r_notebooks/*.html
 *.html
 *.sqlite
