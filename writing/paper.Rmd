@@ -1,0 +1,608 @@
+---
+title: "Variation in Primary Care Prescribing in Wales due to COVID-19"
+author:
+- name: Will Hardy
+  affiliation: '1'
+  corresponding: yes
+  address: Postal address
+  email: my@email.com
+- name: Susan Murphy
+  affiliation: '3'
+- name: Dyfrig Hughes
+  affiliation: '1'
+- name: Daniel Hill-McManus
+  affiliation: '1'
+shorttitle: Welsh Primary Care COVID Prescribing
+output:
+  html_document: default
+  pdf_document: default
+keywords: keywords
+wordcount: X
+bibliography:
+- r-references.bib
+- ../references/library.bib
+header-includes: \usepackage{caption}
+csl: ../references/apa.csl
+always_allow_html: yes
+affiliation:
+- id: '1'
+  institution: Centre for Health Economics & Medicines Evaluation, Bangor University,
+    LL55 2PZ
+- id: '2'
+  institution: Betsi Cadwaladr University Health Board
+---
+
+```{r setup, include = FALSE}
+## Packages
+# devtools::install_github("https://github.com/w-hardy/serCymruTools")
+library(tidyverse)
+library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(furrr)
+library(rebus)
+library(serCymruTools)
+library(knitr)
+library(kableExtra)
+library(geepack)
+library(papaja)
+library(fuzzyjoin)
+
+r_refs("r-references.bib")
+
+plan(cluster)
+## Data
+gp <- 
+  read_rds("../data/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL,
+         practice_id = as.character(practiceid)) %>% 
+  ungroup() %>% 
+  janitor::clean_names() %>% 
+  select(practice_id, year, npat)
+
+
+# CV model accuracies
+cv_model_files <- 
+  paste0("../data/gp_cv_models/", 
+         list.files("../data/gp_cv_models/"))
+names(cv_model_files) <- 
+  cv_model_files %>% 
+  str_remove_all("../data/gp_cv_models/") %>% 
+  str_remove_all("_gp_cv_models.rds")
+
+# Forecast - observed
+differences_files <- 
+  list.files("../data/differences/")
+names(differences_files) <- 
+  str_remove_all(differences_files, "_discreps.rds")
+
+differences <- 
+  furrr::future_map_dfr(.x = differences_files,
+          .f = ~read_rds(paste0("../data/differences/", .x)),
+          .id = "drug") %>% 
+    mutate(.mean = mean(dist),
+           drug = relevel(as_factor(drug), ref = "quant_all_drugs"))
+plan(sequential)
+
+
+# GP extract data
+data_files <-
+  paste0("../data/prescribing_data/", list.files("../data/prescribing_data"))
+names(data_files) <-
+  str_remove_all(list.files("../data/prescribing_data"), ".rds")
+# 
+# gp_extract <- 
+#   map_dfr(.x = data_files[1:11],
+#           .f = ~(read_rds(.x)),
+#           .id = "drug")
+```
+
+
+```{r, analysis-preferences}
+# Seed for random number generation
+set.seed(32)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = FALSE, echo = FALSE)
+kable_opts <- options(knitr.kable.NA = "-")
+```
+
+## Figure 1
+
+
+```{r, figure-1, fig.cap="Data processing flow."}
+include_graphics("figures/data_flow.pdf")
+```
+
+## Table 2
+
+```{r, table-2}
+tibble(regional_unit = unique(differences$regional_unit)) %>% 
+  left_join(read_rds("../data/gp_agesex_qof_combined.rds") %>% 
+              mutate(npat = N,
+                     N = NULL,
+                     regional_unit = as.character(practiceid)) %>% 
+              ungroup() %>% 
+              janitor::clean_names() %>%  
+              filter(year == 2020)) %>% 
+  select(npat, ngp, dispensing, wimd2019:flu) %>% 
+  mutate(across(p_male:flu, ~.x*100)) %>% 
+  tibble() %>% 
+  psych::describe(fast = TRUE) %>% 
+  kable(digits = 2, caption = "Summary of prescribing data and GP practice characteristics")
+```
+
+```{r}
+differences %>% 
+  dplyr::group_by(drug) %>% 
+  dplyr::count() %>% 
+  mutate(n = n/8)
+
+monthlyPrescribing <- 
+  function(data){
+    data %>% 
+      janitor::clean_names() %>% 
+      mutate(datename = dmy(paste0("28-", datename)),
+             practice_id = as.character(practice_id)) %>% 
+      countRegional(practice_id, datename, quantity) %>% 
+      mutate(year = year(datename)) %>%
+      as_tibble() %>% 
+      inner_join(gp %>% 
+                   select(practice_id, year, npat), 
+                 by = c("regional_unit" = "practice_id", "year")) %>% 
+      mutate(n = 1000*n/npat,
+             datename = yearmonth(datename),
+             regional_unit = as_factor(regional_unit)) %>% 
+      select(-c(npat, year)) %>% 
+      as_tsibble(index = datename, key = regional_unit) %>% 
+      fill_gaps()
+  }
+
+plan(cluster)
+pres_2019 <- 
+  data_files[c(1:10)] %>% 
+  furrr::future_map(read_rds) %>% 
+  furrr::future_map(monthlyPrescribing) %>% 
+  furrr::future_map_dfr(as_tibble, .id = "drug") %>% 
+  filter(year(datename) == 2019)
+plan(sequential)
+
+pres_2019 %>% 
+  right_join(differences %>% 
+               group_by(regional_unit, drug) %>% 
+               count() %>% 
+               select(-n)) %>% 
+  filter(drug != "warfarin_ddd") %>% 
+  bind_rows(read_rds(data_files[12]) %>% 
+              mutate(datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
+              rename(regional_unit = practice_id,
+                     n = quantity) %>% 
+              filter(year(datename) == 2019) %>% 
+              right_join(differences %>% 
+                           filter(drug == "warfarin_ddd") %>% 
+                           group_by(regional_unit, drug) %>% 
+                           count() %>% 
+                           select(-n))) %>% 
+  group_by(drug) %>% 
+  summarise(mean = mean(n, na.rm = TRUE),
+            sd = sd(n, na.rm = TRUE),
+            min = min(n, na.rm = TRUE),
+            max = max(n, na.rm = TRUE),
+            n = length(unique(regional_unit))) %>% 
+  select(drug, n, everything()) %>% 
+  kable(digits = 2)
+
+warf_2019 <- 
+  read_rds(data_files[12]) %>% 
+  mutate(datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
+  rename(regional_unit = practice_id) %>% 
+  filter(year(datename) == 2019) %>% 
+  right_join(differences %>% 
+               filter(drug == "warfarin_ddd") %>% 
+               group_by(regional_unit, drug) %>% 
+               count() %>% 
+               select(-n)) %>% 
+
+```
+
+
+## Figure 2
+
+```{r, figure-2, fig.cap="Distribution of the difference between observed and forecast prescribing, expressed as a percentage of forecast prescribing. Grey line marks forecast level of prescribing. Pink shading covers duration of Wales' \"stay at home\" order. Please note the difference y-axis scales across the plots.", dpi=450}
+differences_quantiles <- 
+  differences %>% 
+  na.omit() %>% 
+  dplyr::group_by(datename, drug) %>% 
+  dplyr::summarise(mean_prop = mean(prop, na.rm = T),
+            med_prop = median(prop, na.rm = T),
+            sd_prop = sd(prop, na.rm = T),
+            se_prop = sd(prop, na.rm = T)/sqrt(length(prop)),
+            enframe(stats::quantile(prop, seq(.1,.9,.2)), 
+                    "Percentile", "prop"),
+            .groups = "drop") %>% 
+  dplyr::mutate(datename = month(datename),
+         prop = 100*(prop - 1)) # Percentage change instead of proportion
+
+differences_quantiles %>%
+  dplyr::mutate(datename = factor(x = datename, levels = 1:8, 
+                           labels = month.abb[1:8])) %>% 
+  dplyr::mutate(drug = case_when(drug == "quant_all_drugs" ~ "All",
+                          drug == "ddd_ace" ~ "ACE inhibitors",
+                          drug == "ddd_adreno" ~ "Beta2 adrenoceptor agonists",
+                          drug == "ddd_cortico" ~ "Corticosteroids",
+                          drug == "ddd_hcq" ~ "Hydroxycholoroquine",
+                          drug == "ddd_nsaid" ~ "NSAIDs",
+                          drug == "ddd_oral_contra" ~ "Oral contraceptives",
+                          drug == "ddd_paracet" ~ "Paracetamol",
+                          drug == "ddd_ssri" ~ "SSRIs",
+                          drug == "ddd_vitd" ~ "Vitamin D",
+                          drug == "warfarin" ~ "Warfarin",
+                          drug == "warfarin_ddd" ~"Warfarin"),
+         drug = relevel(as_factor(drug), ref = "All")
+         ) %>%
+  ggplot(aes(x = datename, col = drug, 
+             group = Percentile)) +
+  geom_rect(aes(xmin = "Mar", xmax = "Jul", ymin = -Inf, ymax = Inf),
+            fill = 'pink', col = 0,alpha = 0.03) +
+  geom_line(aes(y = prop, lty = Percentile)) +
+  geom_hline(aes(yintercept = 0), alpha = .5) +
+  facet_wrap(~drug, scales = "free") + 
+  guides(size = "legend", colour = "none") + 
+  theme(legend.position = "bottom", text = element_text(size = 10)) +
+  scale_linetype_manual(values = c(3,2,1,2,3),
+                        # labels = c("10% lower; 90% upper", # Amalgamate line type labels
+                        #            "30% lower; 70% upper", "50%"),
+                        # #breaks = NULL
+                        ) +
+  # scale_linetype_manual(breaks = c("10%", "30%", "50%"), # Remove 70% and 90% from legend
+  #                       values = c(3,2,1,2,3), # Replicate line type
+  #                       labels = c("10% lower; 90% upper", # Amalgamate line type labels
+  #                                   "30% lower; 70% upper", "50%")
+  #                       ) +
+  xlab("Month") +
+  ylab("Percentage difference from forecast prescribing") 
+
+ggsave(filename = "Draft 4/Figures/Figure 2.png", device = "png", width = 10.5)
+```
+
+
+## Table 3
+
+```{r, composite-sd-function-r, eval=FALSE}
+avg <- function(samples){
+  if (length(samples) >= 1){
+    return(sum(samples) / length(samples))
+  }
+  else{return(NaN)}
+}
+
+sample_SD <- function(samples){
+  # Input is an vector of samples; result is the standard deviation
+  mean = avg(samples)
+  sum_of_squared_deviations <-  0
+  sd <-  0
+  if(length(samples) >= 2){
+    for (datum in samples){
+      sum_of_squared_deviations <- 
+        sum_of_squared_deviations + ((datum - mean) * (datum - mean))
+      sd = sqrt(sum_of_squared_deviations / (length(samples)-1))
+    }
+      return(sd)
+  }
+}
+
+compositeSD <- function(means, SDs, ncounts){
+  #Calculate combined standard deviation via ANOVA (ANalysis Of VAriance)
+  # See:  http://www.burtonsys.com/climate/composite_standard_deviations.html
+  #    Inputs are:
+  #      means, the array of group means
+  #      SDs, the array of group standard deviations
+  #      ncounts, number of samples in each group (can be scalar
+  #               if all groups have same number of samples)
+  #    Result is the overall standard deviation.
+  G <- length(means) # number of groups
+  if(G != length(SDs)) stop("Inconsistent lengths (means & sds")
+  if(!is.numeric(ncounts)) {(as.numeric(ncounts))}
+  if(G != length(ncounts)) stop("Inconsistent lengths (means & ncounts)")
+  
+  # Calculate total number of samples, N, and grand mean, GM
+  N = sum(ncounts)  # total number of samples
+  if (N <= 1) stop(paste("Warning: only ", N, " samples, SD is incalculable"))
+  GM <-  0.0
+  for (i in 1:G){
+    GM <- GM + means[i] * ncounts[i]
+  }
+  GM <- GM / N  # grand mean
+  
+  # calculate Error Sum of Squares
+  ESS <-  0.0
+  for (i in 1:G){
+    ESS <- ESS + ((SDs[i])**2) * (ncounts[i] - 1)
+  }
+  
+  # calculate Total Group Sum of Squares
+  TGSS <-  0.0
+  for (i in 1:G){
+    TGSS <- TGSS + ((means[i]-GM)**2) * ncounts[i]
+  }
+  
+  # calculate standard deviation as square root of grand variance
+  result <- sqrt((ESS+TGSS)/(N-1))
+  return(result)
+}
+
+samples = 0:9
+print(paste("avg =", avg(samples)))
+sd = sample_SD(samples)
+print(paste("sd =", sd))
+pt1 = c(0,1,2)
+pt2 = c(3,4)
+pt3 = c(5,6,7,8,9)
+means <- c(avg(pt1), avg(pt2), avg(pt3))
+SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
+ncounts <- c(length(pt1), length(pt2), length(pt3))
+sd2 <- compositeSD(means, SDs, ncounts)
+print(paste("sd2 =", sd2))
+
+samples = 0:8
+print(paste("avg =", avg(samples)))
+sd = sample_SD(samples)
+print(paste("sd =", sd))
+pt1 = c(0,1,2)
+pt2 = c(3,4,5)
+pt3 = c(6,7,8)
+means <- c(avg(pt1), avg(pt2), avg(pt3))
+SDs <- c(sample_SD(pt1), sample_SD(pt2), sample_SD(pt3))
+ncounts <- c(length(pt1), length(pt2), length(pt3))
+sd2 <- compositeSD(means, SDs, ncounts)
+print(paste("sd2 =", sd2))
+
+
+```
+
+
+```{r, table-3-single-fcts, eval=TRUE}
+plan(cluster)
+nat_data <- # Data for all regional units combined
+  data_files %>% 
+  furrr::future_map_dfr(read_rds, .id = "drug") %>% 
+  filter(drug != "warfarin_ddd") %>% 
+  dplyr::group_by(drug, datename) %>% 
+  dplyr::summarise(n = sum(quantity, na.rm = TRUE), .groups = "drop") %>% 
+  mutate(datename = yearmonth(dmy(paste("28", datename, sep = "-"))),
+         regional_unit = as.factor(drug)) %>% # Calling drug regional_unit to save rewriting all the code
+  as_tsibble(index = "datename", key = "regional_unit") %>% 
+  fill_gaps()
+
+precribing_cv_models <- 
+  nat_data %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) %>% 
+  serCymruTools::regionalCV(cv_dist = 8, init = 36, step = 1)
+
+best_model <- 
+  precribing_cv_models %>% 
+  group_by(regional_unit) %>% 
+  rankModels() %>% 
+  slice(1, .preserve = TRUE)
+
+best_mape_over_50 <- 
+  best_model %>% 
+  filter(MAPE > 50)
+
+#### Monthly forecasts ####
+prescribing_fcsts <-
+  nat_data %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) %>% 
+  filter(!regional_unit %in% best_mape_over_50$regional_unit) %>%
+  regionalJointFcsts()
+
+lockdown_fcsts <- 
+  nat_data %>% 
+  filter(datename < yearmonth(dmy("01-01-2020"))) %>% 
+  filter(!regional_unit %in% best_mape_over_50$regional_unit) %>% 
+  fableModels() %>%
+  generate(h = 8, times = 1000) %>%
+  as_tibble() %>% 
+  filter(!datename %in% 
+           yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug", "2020 Sept", "2020 Oct"))) %>% 
+  group_by(.model, regional_unit, .rep) %>% 
+  dplyr::summarise(.sim = sum(.sim)) %>%
+  # Store as a distribution
+  dplyr::summarise(total = distributional::dist_sample(list(.sim))) %>% 
+  mutate(mean = mean(total),
+         lb_95 = stats::quantile(total, .025),
+         lb_80 = stats::quantile(total, .1),
+         med = median(total),
+         ub_80 = stats::quantile(total, .9),
+         ub_95 = stats::quantile(total, .975),
+         sd = distributional::variance(total)^.5,
+         total = NULL)
+  
+plan(sequential)
+
+
+#### Monthly discreps ####
+best_model_discrep <- 
+  best_model %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(mutate(prescribing_fcsts, # Select best forecast
+                    datename = yearmonth(datename)), 
+             by = c(".model", "regional_unit")) %>%
+  left_join(dplyr::mutate(dplyr::select(nat_data, #Join observed dispensing data
+                          c(regional_unit, datename, n)), 
+                   datename = yearmonth(datename)),
+            by = c("datename", "regional_unit")) %>% 
+  mutate(discrepancy = n - med, # observed - forecast
+         prop = n / med) %>% 
+  ungroup()
+
+#### Plot ####
+best_model_discrep %>% 
+  group_by(regional_unit) %>% 
+  dplyr::mutate(across(lb_95:ub_95, ~ 100*(n-.x)/.x)) %>% 
+  ggplot(aes(x = datename)) +
+  geom_line(aes(y = med)) +
+  geom_ribbon(aes(ymin = lb_95, ymax = ub_95), alpha = .3) +
+  geom_hline(aes(yintercept = 0), col = "red")+
+  facet_wrap(~regional_unit, scales = "free")
+
+#### Table ####
+monthly_diffs <- 
+  best_model_discrep %>% 
+  group_by(regional_unit) %>% 
+  dplyr::mutate(across(lb_95:ub_95, ~ 100*(n-.x)/.x)) %>% 
+  select(datename, regional_unit, lb_95, med, ub_95) %>% 
+  mutate(pct_change = paste0(printnum(med), 
+                             "[", printnum(ub_95), ",", 
+                             printnum(lb_95), "]")) %>% 
+  select(datename, regional_unit, pct_change) %>% 
+  pivot_wider(id_cols = regional_unit, names_from = datename, values_from = pct_change)
+
+#### Lockdown discreps ####
+lockdown_model_discrep <- 
+  best_model %>% 
+  select(.model, regional_unit) %>% 
+  inner_join(lockdown_fcsts,  # Select best forecast
+             by = c(".model", "regional_unit")) %>%
+  left_join(nat_data %>% 
+              filter(datename > yearmonth("2020 Feb") &
+                       datename < yearmonth("2020 Aug")) %>% 
+              as_tibble() %>% 
+              select(-datename) %>% 
+              ungroup() %>% 
+              dplyr::group_by(regional_unit) %>% 
+              dplyr::summarise(n = sum(n)),
+            by = "regional_unit") %>% 
+  dplyr::mutate(across(lb_95:ub_95, ~ 100*(n-.x)/.x))
+
+#### Table ####
+lockdown_diffs <- 
+  lockdown_model_discrep %>% 
+  mutate(pct_change = paste0(printnum(med), 
+                             "[", printnum(ub_95), ",", 
+                             printnum(lb_95), "]")) %>% 
+  select(regional_unit, lckdwn = pct_change)
+
+
+#### Joint table ####
+lockdown_diffs %>% 
+  left_join(monthly_diffs, by = "regional_unit") %>% 
+  kable(col.names = c("Drug", "Lockdown", month.abb[1:8]),
+        align = "lrrrrrrrrr",
+        booktabs = TRUE,
+        caption = "Monthly percentage change in prescribing") %>%
+  kable_styling(font_size = 8) %>% 
+  add_header_above(header = c(" " = 1,
+                              "Mean percentage change [95% CI]" = 9)) %>%
+  landscape()
+```
+
+
+
+```{r, table-3, eval=FALSE}
+monthly_diffs <- 
+  differences %>%
+  select(drug, datename, .mean, sd, n) %>% 
+  na.omit() %>% 
+  group_by(drug, datename) %>% 
+  summarise(n = sum(n),
+            sd = compositeSD(.mean, sd, rep(nrow(.),length(.mean))),
+            .mean = sum(.mean),
+            .groups = "drop") %>% 
+  mutate(lb = .mean - 1.96*sd,
+         ub = .mean + 1.96*sd,
+         lb_mean_pct_change = (100 * (n - ub)/ ub),
+         mean_pct_change = (100 * (n - .mean)/ .mean),
+         ub_mean_pct_change = (100 * (n - lb)/ lb)) %>% 
+  mutate(datename = month(datename),
+         pct_change = paste0(printnum(mean_pct_change), 
+                             "[", printnum(lb_mean_pct_change), ",", 
+                             printnum(ub_mean_pct_change), "]")) %>% 
+  pivot_wider(id_cols = drug, names_from = datename, values_from = pct_change)
+
+lockdown_diffs <- 
+  differences %>% 
+  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
+  select(drug, datename, .mean, sd, n) %>% 
+  na.omit() %>% 
+  group_by(drug) %>% 
+  summarise(n = sum(n),
+            sd = compositeSD(.mean, sd, rep(1,length(.mean))),
+            .mean = sum(.mean),
+            .groups = "drop") %>% 
+  mutate(lb = .mean - 1.96*sd,
+         ub = .mean + 1.96*sd,
+         lb_mean_pct_change = (100 * (n - ub)/ ub),
+         mean_pct_change = (100 * (n - .mean)/ .mean),
+         ub_mean_pct_change = (100 * (n - lb)/ lb)) %>% 
+  mutate(pct_change = paste0(printnum(mean_pct_change), 
+                             "[", printnum(lb_mean_pct_change), ",", 
+                             printnum(ub_mean_pct_change), "]")) %>% 
+  select(drug, pct_change)
+
+
+left_join(lockdown_diffs, monthly_diffs) %>%
+  kable(col.names = c("Drug", "Lockdown", month.abb[1:8]),
+        align = "lrrrrrrrrr",
+        booktabs = TRUE,
+        caption = "Monthly percentage change in prescribing") %>%
+  kable_styling(font_size = 8) %>% 
+  add_header_above(header = c(" " = 1,
+                              "Mean percentage change [95% CI]" = 9)) %>%
+  landscape()
+```
+
+
+
+
+
+```{r, eval=FALSE}
+differences %>% 
+  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
+  group_by(drug) %>% 
+  summarise(n = sum(n),
+            .mean = sum(.mean)) %>% 
+  mutate(pct_change = 100 * (n - .mean ) / .mean)
+```
+
+
+
+```{r, eval=FALSE}
+differences %>% 
+  select(drug, datename, .mean, sd, n) %>% 
+  na.omit() %>% 
+  group_by(drug) %>% 
+  summarise(across(where(is.numeric),.fns = max))
+```
+
+
+```{r, eval=FALSE}
+gp_extract %>% 
+  filter(str_detect(datename, "-19")) %>% 
+  group_by(drug) %>% 
+  summarise(n = sum(quantity, na.rm = TRUE)/1e6) %>% 
+  left_join(lockdown_diffs %>% 
+  select(drug, pct_change), by = "drug")
+```
+
+
+
+```{r, eval=FALSE}
+differences %>% 
+  group_by(drug) %>% 
+  summarise(discrepancy = sum(discrepancy, na.rm = TRUE),
+            n = sum(n, na.rm = TRUE),
+            pct = 100*discrepancy / n)
+
+differences %>% 
+  filter(!datename %in% yearmonth(c("2020 Jan", "2020 Feb", "2020 Aug"))) %>% 
+  group_by(drug) %>% 
+  summarise(discrepancy = sum(discrepancy, na.rm = TRUE),
+            n = sum(n, na.rm = TRUE),
+            pct = 100*discrepancy / n) %>% 
+  ggplot(aes(x = reorder(drug, pct), y = pct)) +
+  geom_col()
+```
+
+
+

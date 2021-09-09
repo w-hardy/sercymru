@@ -1,0 +1,719 @@
+---
+title: "Supplementary Information"
+short_title: COVID-19 Prescribing
+bibliography:
+- r-references.bib
+- ../references/library.bib
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+ouput: html_document
+---
+
+```{r setup, include = FALSE}
+## Packages
+# devtools::install_github("w-hardy/serCymruTools")
+library(plyr); library(dplyr)
+library(rms)
+library(nlme)
+library(tidyverse)
+library(lubridate)
+library(tsibble)
+library(fable)
+library(feasts)
+library(furrr)
+library(rebus)
+library(serCymruTools)
+library(knitr)
+library(kableExtra)
+library(geepack)
+library(papaja)
+library(fuzzyjoin)
+library(ggbiplot)
+
+r_refs("r-references.bib")
+
+## Data
+gp <- 
+  read_rds("../data/gp_agesex_qof_combined.rds") %>% 
+  mutate(npat = N,
+         N = NULL,
+         practice_id = as.character(practiceid),
+         hboard = case_when(hboard == "W11000023" ~ 
+                              "Betsi Cadwaladr",
+                            hboard == "W11000024" ~ 
+                              "Powys",
+                            hboard == "W11000025" ~ 
+                              "Hywel Dda",
+                            hboard == "W11000028" ~ 
+                              "Aneurin Bevan",
+                            hboard == "W11000029" ~ 
+                              "Cardiff and Vale",
+                            hboard == "W11000030" ~ 
+                              "Cwm Taf Morgannwg",
+                            hboard == "W11000031" ~ 
+                              "Swansea Bay")) %>% 
+  ungroup() %>% 
+  janitor::clean_names() %>% 
+  mutate(dispensing = case_when(tolower(dispensing) == "yes" ~ TRUE, 
+                                tolower(dispensing) == "no" ~ FALSE),
+         hboard = as.factor(hboard))
+
+# GP extract data
+data_files <-
+  paste0("../data/prescribing_data/", list.files("../data/prescribing_data")) 
+names(data_files) <- 
+  str_remove_all(list.files("../data/prescribing_data"), ".rds")
+
+# CV model accuracies
+cv_model_files <- 
+  paste0("../data/gp_cv_models/", 
+         list.files("../data/gp_cv_models/"))
+names(cv_model_files) <- 
+  cv_model_files %>% 
+  str_remove_all("../data/gp_cv_models/") %>% 
+  str_remove_all("_gp_cv_models.rds")
+
+# Forecast - observed
+differences_files <- 
+  list.files("../data/differences/")
+names(differences_files) <- 
+  str_remove_all(differences_files, "_discreps.rds")
+
+plan(cluster)
+differences <- 
+  furrr::future_map_dfr(.x = differences_files,
+                        .f = ~read_rds(paste0("../data/differences/", .x)),
+                        .id = "drug") %>% 
+  mutate(drug = relevel(as_factor(drug), ref = "quant_all_drugs"),
+         drug = str_remove_all(drug, "ddd_"),
+         drug = str_remove_all(drug, "quant_"),
+         drug = str_remove_all(drug, "_ddd")) %>% 
+  filter(regional_unit != "W95636") #https://abuhb.nhs.wales/news/news/important-information-regarding-lansbury-surgery-caerphilly/
+
+plan(sequential)
+
+# Seed for random number generation
+set.seed(32)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = FALSE, 
+                      echo = FALSE, fig.pos = 'H')
+kable_opts <- options(knitr.kable.NA = "-")
+```
+
+\renewcommand{\appendixname}{Supplementary Material}
+\renewcommand{\thefigure}{SI\arabic{figure}} \setcounter{figure}{0}
+\renewcommand{\thetable}{SI\arabic{table}} \setcounter{table}{0}
+\renewcommand{\theequation}{SI\arabic{table}} \setcounter{equation}{0}
+
+
+## GP PCA
+
+```{r, gp-pca, fig.cap="Variance of QoF variables explained by individual principal components (lines) with cumulative proportion of variance explained (text)."}
+#### Data ####
+gp_2020 <- filter(gp, year == 2020)
+
+#### Functions ####
+# Add cumulative fraction of variance explained
+addScree <- function(x, npcs=min(10, length(x$sdev)),
+                     plotv = FALSE,
+                     col = 1, offset = .8, adj = 0, pr = FALSE){
+  vars <- x$sdev^2
+  cumv <- cumsum(vars)/sum(vars)
+  if(pr) print(cumv)
+  text(1:npcs, vars[1:npcs] + offset*par("cxy")[2],
+       as.character(round(cumv[1:npcs], 2)),
+       srt = 45, adj = adj, cex = .65, xpd = NA, col = col)
+}
+
+#### Analysis ####
+gp_pca <- 
+  prcomp(select(gp_2020, chd:flu), center = TRUE, scale. = TRUE)
+
+plot(gp_pca, type = "lines", main = " ")
+addScree(gp_pca)
+abline(h = 1, col = "blue")
+
+```
+
+
+```{r, gp-pca-direction, fig.cap="QoF disease register loadings on PC1 and PC2"}
+ggbiplot(gp_pca, ellipse = TRUE, groups = gp_2020$hboard, obs.scale = 1, 
+         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5) 
+
+gp_2020 <- 
+  gp_2020 %>% 
+  left_join(bind_cols(practice_id = gp_2020$practice_id, gp_pca$x), 
+            by = "practice_id") %>% 
+  select(regional_unit = practice_id, everything(),
+         -c(practiceid, county, cluster, postcode, lsoacode, easting, northing,
+            chd:flu, PC4:PC18, year))
+```
+
+
+## Excluded practices
+
+Table with a row for each drug and a column for each reason a practice could be excluded, with a total column at the end
+
+(a) missing any data in the COVID months, (b) more than 10% of the pre-COVID data (i.e., 6 months) missing, or (c) MAPE >50.
+
+
+```{r, excluded-practices-tab, eval=TRUE}
+months <- c("2015 Jan","2015 Feb","2015 Mar","2015 Apr","2015 May","2015 Jun",
+            "2015 Jul","2015 Aug","2015 Sep","2015 Oct","2015 Nov","2015 Dec",
+            "2016 Jan","2016 Feb","2016 Mar","2016 Apr","2016 May","2016 Jun",
+            "2016 Jul","2016 Aug","2016 Sep","2016 Oct","2016 Nov","2016 Dec",
+            "2017 Jan","2017 Feb","2017 Mar","2017 Apr","2017 May","2017 Jun",
+            "2017 Jul","2017 Aug","2017 Sep","2017 Oct","2017 Nov","2017 Dec",
+            "2018 Jan","2018 Feb","2018 Mar","2018 Apr","2018 May","2018 Jun",
+            "2018 Jul","2018 Aug","2018 Sep","2018 Oct","2018 Nov","2018 Dec",
+            "2019 Jan","2019 Feb","2019 Mar","2019 Apr","2019 May","2019 Jun",
+            "2019 Jul","2019 Aug","2019 Sep","2019 Oct","2019 Nov","2019 Dec",
+            "2020 Jan","2020 Feb","2020 Mar","2020 Apr","2020 May","2020 Jun",
+            "2020 Jul","2020 Aug")
+
+monthlyPrescribing <- 
+  function(data){
+    data %>% 
+      janitor::clean_names() %>% 
+      mutate(datename = dmy(paste0("28-", datename)),
+             practice_id = as.character(practice_id)) %>% 
+      countRegional(practice_id, datename, quantity) %>% 
+      mutate(year = year(datename)) %>%
+      as_tibble() %>% 
+      inner_join(gp %>% 
+                   select(practice_id, year, npat), 
+                 by = c("regional_unit" = "practice_id", "year")) %>% 
+      mutate(n = 1000*n/npat,
+             datename = yearmonth(datename),
+             regional_unit = as_factor(regional_unit)) %>% 
+      select(-c(npat, year)) %>% 
+      as_tsibble(index = datename, key = regional_unit) %>% 
+      fill_gaps()
+  }
+
+gpMissing <- 
+  function(data){
+    data %>% 
+      as_tibble() %>% 
+      pivot_wider(id_cols = regional_unit, names_from = datename,
+                  values_from = n, values_fill = NA) %>% 
+      select(all_of(months), everything()) %>% 
+      rowwise() %>% 
+      mutate(across(.cols = `2015 Jan`:`2020 Aug`, .fns = is.na)) %>% 
+      group_by(regional_unit) %>% 
+      summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2019 Dec`)),
+                miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
+      filter(miss_covid > 0 | miss_non_covid > 0) %>% 
+      mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
+  }
+
+missRemove <- 
+  function(data){
+    data %>% 
+      mutate(remove = if_else((miss_covid > 0 | miss_10_non_covid == TRUE), 
+                              TRUE, FALSE)) %>% 
+      summarise(miss_covid = sum(if_else(miss_covid > 0, TRUE, FALSE)),
+                miss_10_non_covid = sum(if_else(miss_non_covid > 60/10, TRUE,
+                                                FALSE)),
+                miss_either = sum(if_else(remove == TRUE, TRUE, FALSE)))
+  }
+
+plan(cluster)
+
+full_data <- 
+  data_files[c(1:10,12)] %>% 
+  furrr::future_map(read_rds)
+
+n_practices <- 
+  full_data %>% 
+  map(pluck("practice_id")) %>% 
+  map(unique) %>% 
+  map_dfr(length) %>% 
+  pivot_longer(cols = everything(), names_to = "drug", values_to = "n")
+
+missing_gp  <-
+  full_data %>% 
+  map(pluck("practice_id")) %>% 
+  map(unique) %>% 
+  map_dfr(~length(.)-sum(. %in% gp$practice_id), .id = "drug") %>% 
+  pivot_longer(cols = everything(), names_to = "drug", 
+               values_to = "missing_gp")
+
+missing_raw_data <- 
+  full_data %>% 
+  furrr::future_map(monthlyPrescribing) %>% 
+  furrr::future_map(gpMissing) %>% 
+  furrr::future_map_dfr(missRemove, .id = "drug")
+
+poor_forcasts <- 
+  cv_model_files %>% 
+  map_dfr(.id = "drug", .f = read_rds) %>% 
+  rankModels() %>% 
+  group_by(drug, regional_unit) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  filter(MAPE >= 50) %>% 
+  group_by(drug) %>% 
+  summarise(mape_over_50 = n())
+plan(sequential)
+
+n_practices %>% 
+  left_join(missing_gp, by = "drug") %>% 
+  left_join(missing_raw_data, by = "drug") %>% 
+  left_join(poor_forcasts, by = "drug") %>% 
+  mutate(drug = str_remove_all(drug, "ddd_"),
+         drug = str_remove_all(drug, "quant_"),
+         drug = str_remove_all(drug, "_ddd"),
+         drug = relevel(as_factor(drug), ref = "all_drugs")) %>%
+  rowwise() %>% 
+  mutate(mape_over_50 = if_else(is.na(mape_over_50), as.integer(0), mape_over_50),
+         total_removed = missing_gp + miss_either + mape_over_50, 
+         n_rem = n - total_removed) %>% 
+  knitr::kable(booktabs = TRUE, linesep = "", 
+               col.names = c("drug", "n", "gp", "covid", "10_non_covid",
+                             "either", "mape >50", "total", "remain"),
+               caption = "Summary of GP practices removed for each drug.") %>% 
+  footnote(general = "The total is not always equal to the row sum, as a single practice may be missing both data in covid months and more than 10\\% of data in the non-covid months, but will only be excluded once.",
+           threeparttable = TRUE)
+```
+
+
+```{r, big-discrepacies, eval=FALSE}
+drugs <- unique(differences$drug)
+
+bigDiscreps <- function(x){
+  message(x)
+  
+  big_discreps2 <- 
+    differences %>% 
+    filter(drug == x) %>% 
+    filter(prop <.3| prop > 2) %>% 
+    group_by(regional_unit) %>% 
+    count()
+  
+  differences %>% 
+    filter(drug == x) %>% 
+    filter(regional_unit %in% big_discreps2$regional_unit) %>% 
+    mutate(uid = paste(x, regional_unit)) %>% 
+    ggplot(aes(x = datename, col = as.factor(regional_unit))) +
+    geom_line(aes(y = med), lty = 1) +
+    geom_line(aes(y = n), lty = 2) +
+    facet_wrap(~uid, scales = "free") +
+    theme(legend.position = "none")
+}
+
+map(.x = drugs, .f = ~bigDiscreps(.x))
+
+```
+
+
+## Forecasting
+
+### Forecasting models
+
+* We did not assume that the existing processes would be the same for all drugs or all GP practices, therefore, we investigated the fit of several different time series models to the pre-COVID data. 
+* We used the `fable` [@R-fable] and `fasster` [@R-fasster] packages to conduct the time series analyses.
+  * Time series linear model
+    * $y_t = \beta_0 + \beta_1x_t + \varepsilon_t$
+  * Simple methods
+      * Naïve (with and without drift)
+        * $\hat{y}_{T+h|T} = y_T$
+      * Seasonal naïve (with and without drift)
+        * $\hat{y}_{T+h|T} = y_{T-m(k+1)}$ where $m$ = seasonal period and $k$ is the complete years in $T+h$
+  * Seasonal and Trend decomposition using Loess (STL) model [@Cleveland1990]
+    * Fixed and variable seasonality
+  * Autoregressive integrated moving average [ARIMA; @Box2015]
+    * Using a version of the Hyndman-Khandakar algorithm [@Hyndman2008]
+  * Exponential smoothing [@Holt2004; @Winters1960]
+    * Simple exponential smoothing
+    * Holt-Winters Additive Model [@Chatfield1978]
+  * Forecasting with Additive Switching of Seasonality, Trends and Exogenous Regressors [fasster; @R-fasster]
+    * State space model
+  * Combination models [cf. @Clemen1989; @Thomson2019]
+    * Forecasts that are made by combining models are often more accurate than those of the individual forecasts and often a simple average can significantly improve forecast accuracy.
+    
+
+    
+* Prescribing quantities were log transformed and the forecasts use median estimates of prescribing to reduce bias that back transformation would introduce when using the mean
+* Using January 2015 to December 2019 data, we fitted several different models and assessed their accuracy using a cross-validated process to reduce the likelihood of overfitting models to the data.
+  * Started with 36 months of data, used an 8-month horizon as this was the horizon we would be using for the forecasts, 1-month step
+    * Only interested in one forecast horizon: eight-months
+    
+```{r, time-series-model-tab}
+
+readxl::read_xlsx("time_series_models.xlsx") %>% 
+    knitr::kable(booktabs = TRUE, linesep = "",
+               caption = "Description of time series models used.")
+
+```
+
+## Reproducability and code
+
+We used `r cite_r("r-references.bib")` for all our analyses, functions are available in the `serCymruTools` package [@R-serCymruTools], and all other code is available at https://github.com/w-hardy/sercymru.
+
+
+## Cross-validated model accuracy
+
+```{r, cv-model-accuracy-by-drug-tab, eval=FALSE}
+cv_model_files %>% 
+  map_dfr(.id = "drug", .f = read_rds) %>% 
+  mutate(drug = str_remove_all(drug, "ddd_"),
+         drug = str_remove_all(drug, "quant_"),
+         drug = str_remove_all(drug, "_ddd"),
+         drug = relevel(as_factor(drug), ref = "all_drugs")) %>%
+  rankModels() %>% 
+  group_by(drug, regional_unit) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  filter(MAPE < 50) %>% 
+  group_by(drug) %>% 
+  summarise(n_practice_retained = n(),
+            mape_mean = mean(MAPE),
+            mape_sd = sd(MAPE)) %>% 
+  kable(caption = "Accuaracy of cross-validated models retained for forecasting.",
+               digits = 2)
+```
+
+
+```{r, individual-drug-accuracy-plot, fig.cap="Accuracy of best model for each regional unit by drug, as measured by mean absoloute percentage error (MAPE). Models with MAPE > 50 have been removed. ACEi = ACE inhibitors, BAA = Beta~2~ adrenoceptor agonists, HCQ = Hydroxycholoroquine."}
+
+plan(cluster)
+cv_model_files %>% 
+  furrr::future_map_dfr(.id = "drug", .f = read_rds) %>% 
+  mutate(drug = str_remove_all(drug, "ddd_"),
+         drug = str_remove_all(drug, "quant_"),
+         drug = str_remove_all(drug, "_ddd"),
+         drug = case_when(drug == "all_drugs" ~ "All",
+                          drug == "ace" ~ "ACEi",
+                          drug == "adreno" ~ "BAA",
+                          drug == "cortico" ~ "Inhaled \ncortico",
+                          drug == "hcq" ~ "HCQ",
+                          drug == "nsaid" ~ "NSAIDs",
+                          drug == "oral_contra" ~ "Oral\ncontra",
+                          drug == "paracet" ~ "Paracet",
+                          drug == "ssri" ~ "SSRIs",
+                          drug == "vitd" ~ "Vit D",
+                          drug == "warfarin" ~ "Warfarin"),
+         drug = relevel(as_factor(drug), ref = "All")) %>%
+  rankModels() %>% 
+  group_by(drug, regional_unit) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  filter(MAPE < 50) %>% 
+  ggplot(aes(x = drug, y = MAPE, col = drug)) +
+  geom_violin() +
+  geom_jitter(alpha = .1) +
+  xlab("Medicine group") +
+  theme(legend.position = "none")
+
+```
+
+
+```{r best-cv-model-type, fig.cap="Performance by model type."}
+plan(cluster)
+cv_model_files %>% 
+  map_dfr(.id = "drug", .f = read_rds) %>% 
+  rankModels() %>% 
+  group_by(drug, regional_unit) %>% 
+  slice(1, .preserve = TRUE) %>% 
+  filter(MAPE < 50) %>% 
+  ggplot(aes(x = as.factor(.model))) +
+  geom_bar(aes(fill = as.factor(drug)), col = "black", size = .25) +
+  theme(axis.text.x = element_text(angle = 90))
+plan(sequential)
+```
+
+
+---
+
+
+
+
+## GEE results
+
+```{r, gee-analysis, eval = FALSE}
+ace <- 
+  differences %>% 
+  filter(drug == "ddd_ace") %>% 
+  group_by(datename) %>% 
+  slice(1:100, .preserve = TRUE) %>% 
+  left_join(filter(gp, year == 2020), by = c("regional_unit" = "practice_id")) %>% 
+  mutate(time_order = as.numeric(as.factor(datename)))
+
+ace_gee <- geeglm(prop ~ wimd2019, data = ace, id = regional_unit, waves = time_order, corstr = "ar1")
+
+summary(ace_gee)
+```
+
+
+## GLS Results
+
+```{r, gls-functions}
+#### Prep GLS data ####
+glsData <- function(data){
+  df <- 
+    differences %>% 
+    filter(drug == data) %>% 
+    mutate(time_order = as.numeric(as.factor(datename)),
+           pct_change = 100*(prop - 1)) %>% 
+    select(c(regional_unit, time_order, pct_change))
+  
+  baseline <- subset(df, time_order == 2, -time_order)
+  baseline <- upData(baseline, rename = c(pct_change = "prop0"), print = FALSE)
+  followup <- subset(df, time_order > 2)
+  both <- merge(baseline, followup, by = c("regional_unit"))
+  
+  #### Join GP and GLS data ####
+  both <- 
+    both %>% 
+    left_join(gp_2020, by = "regional_unit") %>% 
+    mutate(gp_load = npat / ngp)
+  
+  dd <- datadist(both)
+  options(datadist = "dd")
+  
+  return(both)
+}
+
+
+#### GLS Analysis function ####
+bestGLS <- function(data){
+  cp <- list(corAR1, corExp, corCompSymm, corLin, corGaus, corSpher)
+  z <- vector("list", length(cp))
+  
+  ### Fit models
+  for(k in 1:length(cp)){
+    z[[k]] <- gls(pct_change ~ dispensing + hboard + rcs(time_order, 4) + rcs(prop0, 4) + 
+                    rcs(wimd2019, 4) + rcs(p_male, 4) + rcs(pm_65, 4) + 
+                    rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + rcs(ngp, 4) + 
+                    rcs(gp_load, 4),
+                  data = data,
+                  correlation = cp[[k]](form = ~time_order | regional_unit))
+  }
+  
+  ### Select best model
+  anova(z[[1]], z[[2]], z[[3]], z[[4]], z[[5]], z[[6]])
+  best_model_aic <- 
+    anova(z[[1]], z[[2]], z[[3]], z[[4]], z[[5]], z[[6]]) %>% 
+    select(-call) %>% 
+    tibble() %>% 
+    arrange(AIC) %>% 
+    head(1) %>% 
+    .$Model
+
+  ### Fit best model
+  a <-  Gls(pct_change ~ dispensing + hboard + rcs(time_order, 4) + 
+              rcs(prop0, 4) + rcs(wimd2019, 4) + rcs(p_male, 4) + rcs(pm_65, 4) +               rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4)+ rcs(ngp, 4) + 
+                    rcs(gp_load, 4),
+            data = data, B = 1000, 
+            correlation = cp[[best_model_aic]](form = ~time_order | regional_unit))
+  
+  return(a)
+}
+
+#### GLS Assumption Checking ####
+glsAssump <- function(model, data){
+  data$resid <- r <- resid(model); data$fitted <- fitted(model)
+  y1 <- ylab("Residuals")
+  p1 <- ggplot(data, aes(x = fitted, y = resid)) + geom_point() + 
+    facet_grid(~hboard) + y1
+  p2 <- ggplot(data, aes(x = prop0, y = resid)) + geom_point() + y1
+  p3 <- ggplot(data, aes(x = time_order, y = resid)) + y1 + 
+    stat_summary(fun.data = "mean_sdl", geom = "smooth")
+  p4 <- ggplot(data, aes(sample = resid)) + stat_qq() + 
+    geom_abline(intercept = mean(r), slope = sd(r)) + y1
+  
+  gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+}
+
+#### GLS Estimated Effects ####
+glsEffects <- function(model, name){
+  p1 <- ggplot(Predict(model, time_order, dispensing, conf.int = FALSE),
+               adj.subitle = FALSE, legend.position = "top", )
+  p2 <- ggplot(Predict(model, prop0), adj.subtitle = FALSE)
+  p3 <- ggplot(Predict(model, pm_65), adj.subtitle = FALSE)
+  p4 <- ggplot(Predict(model, p_male), adj.subtitle = FALSE)
+  p5 <- ggplot(Predict(model, wimd2019), adj.subtitle = FALSE)
+  p6 <- ggplot(Predict(model, PC1), adj.subtitle = FALSE)
+  p7 <- ggplot(Predict(model, PC2), adj.subtitle = FALSE)
+  p8 <- ggplot(Predict(model, PC3), adj.subtitle = FALSE)
+  p9 <- ggplot(Predict(model, hboard), adj.subtitle = FALSE)
+  p10 <- ggplot(Predict(model, ngp), adj.subtitle = FALSE)
+  p11 <- ggplot(Predict(model, gp_load), adj.subtitle = FALSE)
+  gridExtra::grid.arrange(p1,p2,p3,p4, ncol = 2)
+  gridExtra::grid.arrange(p5,p6,p7,p8, ncol = 2)
+  gridExtra::grid.arrange(p9,p10,p11, ncol = 2)
+  
+  capture.output(print(model))[16:53] %>% 
+    read_table(., col_names = c(" ", "Coef", "S.E.", "t", "Pr(>|t|)")) %>% 
+    kable(booktabs = TRUE, linesep = "", digits = 2,
+               caption = paste(name, "coefficents")) %>% 
+    kable_styling(bootstrap_options = "striped") %>% 
+    print()
+  
+  plot(anova(model))
+
+  model %>% 
+    anova() %>% 
+    kable(booktabs = TRUE, linesep = "", digits = 2,
+          caption = paste(name, "anova")) %>% 
+    add_indent(positions = c(4,6,8,10,12,14,16,18,20,22)) %>% 
+    kable_styling(bootstrap_options = "striped") %>% 
+    print()
+  
+  # time_order and prop0 dominate so not useful
+  # n <- nomogram(model, abbrev = TRUE)
+  # plot(n, )
+  cat("\n\n")
+}
+
+
+drugs <- unique(differences$drug)
+
+gls_analysis_fig_cap <- 
+  paste(paste(drugs, "assumptions"), paste(drugs, "effects1"), 
+        paste(drugs, "effects2"), paste(drugs, "effects3"), 
+        paste(drugs, "anova"), paste(drugs, "nomogram"))
+
+gls_analysis_fig_cap <- NULL
+for (i in 1:length(drugs)) {
+  gls_analysis_fig_cap <- 
+    c(gls_analysis_fig_cap, 
+      paste(drugs[i], c("assumptions", "effects1", "effects2", "effects3",
+                        "anova", "nomogram")))
+}
+
+```
+
+
+
+```{r, gls-analysis, results="asis", fig.cap=gls_analysis_fig_cap}
+drugs <- unique(differences$drug)
+
+best_models <- list()
+
+for(i in drugs){
+  cat("###", (i), "\n\n")
+  gls_data <- glsData(i)
+  dd <- datadist(gls_data)
+  options(datadist = "dd")
+  best_gls <- bestGLS(gls_data)
+  cat("####", "Assumptions\n\n")
+  glsAssump(best_gls, gls_data)
+  cat("\n\n")
+  cat("####", "Effects\n\n")
+  glsEffects(best_gls, i)
+  rm(dd)
+  cat("\n\n")
+  best_models[[i]] <- 
+    best_gls
+}
+
+best_model_coefs <- 
+  best_models %>% 
+  map(~capture.output(print(.))[16:53] %>% 
+        read_table(col_names = c("Coef", "Est", "S.E.", "t", "Pr(>|t|)"))) %>%
+  map_dfr(as_tibble, .id = "drug")
+
+best_model_corr <- 
+  best_models %>% 
+  map(~list(str = capture.output(print(.))[55],
+            measure = capture.output(print(.))[58],
+            value = capture.output(print(.))[59]))
+```
+
+
+```{r, gls-coef-tab-signif, results="asis"}
+
+best_model_coefs %>% 
+  mutate(`Pr(>|t|)` = as.numeric(str_remove_all(string = `Pr(>|t|)`, "<")),
+         Est = case_when(`Pr(>|t|)` < .05 ~ 
+                           paste0(printnum(Est, digits = 2), "*"),
+                         `Pr(>|t|)` >= .05 ~
+                           as.character(printnum(Est, digits = 2, format = "f")))) %>%
+  kable(booktabs = TRUE, linesep = "", digits = 2, align = "r",
+        caption = "Summary of GLS coefficents") %>% 
+  kable_styling(bootstrap_options = "striped") %>% 
+  landscape() %>% 
+  print()
+```
+
+
+```{r, gls-coef-tab-ci, results="asis"}
+
+best_model_coefs %>% 
+  mutate(`Pr(>|t|)` = as.numeric(str_remove_all(string = `Pr(>|t|)`, "<")),
+         Est = paste0(printnum(Est, digits = 2), "[", 
+                      printnum(Est - 1.96*S.E., digits = 2), ",", 
+                      printnum(Est + 1.96*S.E., digits = 2), "]")) %>% 
+  pivot_wider(id_cols = Coef, names_from = drug, values_from = Est) %>% 
+  kable(booktabs = TRUE, linesep = "", digits = 2, align = "r",
+        caption = "Summary of GLS coefficents [95% CI]") %>% 
+  kable_styling(bootstrap_options = "striped") %>% 
+  landscape() %>% 
+  print()
+```
+
+
+```{r, gls-coef-plot}
+coefs <- unique(best_model_coefs$Coef)
+
+coef_plot_order <- 
+  list(coefs[1:2],coefs[3:8], coefs[9:20], coefs[21:32],coefs[33:38])
+
+
+for (i in 1:length(coef_plot_order)) {
+  p <- best_model_coefs %>% 
+    filter(Coef %in% coef_plot_order[[i]]) %>% 
+    ggplot(aes(y = drug, group = as.factor(str_count(Coef, "'")), 
+                                           col = drug)) +
+    geom_point(aes(x = Est, shape = as.factor(str_count(Coef, "'"))), 
+               position = position_dodge(width=.75)) +
+    geom_errorbarh(aes(xmin = Est - 1.96* S.E., xmax = Est + 1.96* S.E.,
+                       height = 0),
+                   position = position_dodge(width=.75), ) +
+    geom_vline(aes(xintercept = 0), col = "grey") +
+    facet_wrap(~str_remove_all(Coef, "'"), scales = "free_x", ) + 
+    guides(shape = "legend", colour = "none")
+  
+  print(p)
+  
+}
+
+```
+
+
+
+
+## Warfarin
+
+```{r, oac-gen-trend, fig.cap="Warfarin as a percentage of all oral anticoagulant prescribing in Wales. Pink shading covers duration of Wales' \"stay at home\" order."}
+read_rds("../data/prescribing_data/warfarin_ddd.rds") %>% 
+  dplyr::group_by(datename) %>% 
+  dplyr::summarise(quantity = median(quantity, na.rm = TRUE)) %>% 
+  mutate(datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
+  ggplot(aes(x = datename)) + 
+  geom_line(aes(y = quantity)) +
+  geom_vline(aes(xintercept = dmy("01-03-2020")), lty = 2, col = "red") +
+  geom_rect(aes(xmin = dmy("01-03-2020"), xmax = dmy("31-07-2020"), 
+                ymin = -Inf, ymax = Inf),
+            fill = 'pink', col = 0, alpha = 0.03) +
+  scale_x_yearmonth() +
+  xlab("Date") +
+  ylab("Warfarin (percentage of all OACs)") +
+  ylim(0, 100) # Dyfrig's request
+
+```
+
+
+
+\newpage
+
+## SM References
+
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+<div id="refs" custom-style="Bibliography"></div>
+\endgroup
+
+\newpage
