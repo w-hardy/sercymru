@@ -5,7 +5,9 @@ serCymruTools/
 archive
 OneDrive/
 htai/
-writing/
+writing/*
+!writing/paper.Rmd
+!writing/appendix_a.Rmd
 /r_notebooks/*.html
 *.html
 *.sqlite
