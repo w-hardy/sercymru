@@ -6,9 +6,18 @@ bibliography:
 - ../references/library.bib
 output:
   pdf_document: default
-  html_document:
-    df_print: paged
-ouput: html_document
+
+papersize: a4
+header-includes:
+  \usepackage{float}
+  \let\origfigure\figure
+  \let\endorigfigure\endfigure
+  \renewenvironment{figure}[1][2] {
+      \expandafter\origfigure\expandafter[H]
+  } {
+      \endorigfigure
+  }
+
 ---
 
 ```{r setup, include = FALSE}
@@ -27,7 +36,6 @@ library(rebus)
 library(serCymruTools)
 library(knitr)
 library(kableExtra)
-library(geepack)
 library(papaja)
 library(fuzzyjoin)
 library(ggbiplot)
@@ -40,20 +48,13 @@ gp <-
   mutate(npat = N,
          N = NULL,
          practice_id = as.character(practiceid),
-         hboard = case_when(hboard == "W11000023" ~ 
-                              "Betsi Cadwaladr",
-                            hboard == "W11000024" ~ 
-                              "Powys",
-                            hboard == "W11000025" ~ 
-                              "Hywel Dda",
-                            hboard == "W11000028" ~ 
-                              "Aneurin Bevan",
-                            hboard == "W11000029" ~ 
-                              "Cardiff and Vale",
-                            hboard == "W11000030" ~ 
-                              "Cwm Taf Morgannwg",
-                            hboard == "W11000031" ~ 
-                              "Swansea Bay")) %>% 
+         hboard = case_when(hboard == "W11000023" ~ "BC",
+                            hboard == "W11000024" ~ "P",
+                            hboard == "W11000025" ~ "HD",
+                            hboard == "W11000028" ~ "AB",
+                            hboard == "W11000029" ~ "CaV",
+                            hboard == "W11000030" ~ "CTM",
+                            hboard == "W11000031" ~ "SB")) %>% 
   ungroup() %>% 
   janitor::clean_names() %>% 
   mutate(dispensing = case_when(tolower(dispensing) == "yes" ~ TRUE, 
@@ -65,6 +66,8 @@ data_files <-
   paste0("../data/prescribing_data/", list.files("../data/prescribing_data")) 
 names(data_files) <- 
   str_remove_all(list.files("../data/prescribing_data"), ".rds")
+pres_data <- 
+  map(data_files, read_rds)
 
 # CV model accuracies
 cv_model_files <- 
@@ -96,8 +99,8 @@ plan(sequential)
 
 # Seed for random number generation
 set.seed(32)
-knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = FALSE, 
-                      echo = FALSE, fig.pos = 'H')
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE, 
+                      echo = FALSE, fig.pos = 'h!')
 kable_opts <- options(knitr.kable.NA = "-")
 ```
 
@@ -111,7 +114,10 @@ kable_opts <- options(knitr.kable.NA = "-")
 
 ```{r, gp-pca, fig.cap="Variance of QoF variables explained by individual principal components (lines) with cumulative proportion of variance explained (text)."}
 #### Data ####
-gp_2020 <- filter(gp, year == 2020)
+gp_2020 <- 
+  filter(gp, year == 2020) %>% 
+  rename(regional_unit = practice_id)
+  
 
 #### Functions ####
 # Add cumulative fraction of variance explained
@@ -128,26 +134,47 @@ addScree <- function(x, npcs=min(10, length(x$sdev)),
 
 #### Analysis ####
 gp_pca <- 
-  prcomp(select(gp_2020, chd:flu), center = TRUE, scale. = TRUE)
+  prcomp(select(gp_2020, c(chd:flu, p_fem, pm_65, pf_65)), center = TRUE, scale. = TRUE)
 
-plot(gp_pca, type = "lines", main = " ")
+plot(gp_pca, type = "lines", main = " ", pch = 3)
 addScree(gp_pca)
 abline(h = 1, col = "blue")
 
+gp_2020 <- 
+  gp_2020 %>% 
+  left_join(bind_cols(regional_unit = gp_2020$regional_unit, gp_pca$x), 
+            by = "regional_unit") %>% 
+  select(regional_unit = regional_unit, everything(),
+         -c(practiceid, county, postcode, lsoacode, easting, northing,
+            chd:flu, PC6:PC20, year))
 ```
 
 
-```{r, gp-pca-direction, fig.cap="QoF disease register loadings on PC1 and PC2"}
-ggbiplot(gp_pca, ellipse = TRUE, groups = gp_2020$hboard, obs.scale = 1, 
-         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5) 
+```{r, gp-pca-direction, fig.cap=c("QoF disease register loadings on PC 1-2","QoF disease register loadings on PC 2-3","QoF disease register loadings on PC 3-4","QoF disease register loadings on PC 4-5")}
+p1 <- ggbiplot(gp_pca, ellipse = FALSE, groups = gp_2020$hboard, obs.scale = 1, 
+         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5)  +
+      scale_colour_viridis_d(name = "Health board")
+p2 <- ggbiplot(gp_pca, choices = 2:3,
+         ellipse = FALSE, groups = gp_2020$hboard, obs.scale = 1, 
+         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5)  +
+      scale_colour_viridis_d(name = "Health board")
+p3 <- ggbiplot(gp_pca, choices = 3:4,
+         ellipse = FALSE, groups = gp_2020$hboard, obs.scale = 1, 
+         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5)  +
+      scale_colour_viridis_d(name = "Health board")
+p4 <- ggbiplot(gp_pca, choices = 4:5,
+         ellipse = FALSE, groups = gp_2020$hboard, obs.scale = 1, 
+         var.scale = 1, alpha = .3, varname.size = 5, varname.adjust = 5)  +
+      scale_colour_viridis_d(name = "Health board")
+p1
+cat("\n\n")
+p2
+cat("\n\n")
+p3
+cat("\n\n")
+p4
+cat("\n\n")
 
-gp_2020 <- 
-  gp_2020 %>% 
-  left_join(bind_cols(practice_id = gp_2020$practice_id, gp_pca$x), 
-            by = "practice_id") %>% 
-  select(regional_unit = practice_id, everything(),
-         -c(practiceid, county, cluster, postcode, lsoacode, easting, northing,
-            chd:flu, PC4:PC18, year))
 ```
 
 
@@ -203,9 +230,9 @@ gpMissing <-
       mutate(across(.cols = `2015 Jan`:`2020 Aug`, .fns = is.na)) %>% 
       group_by(regional_unit) %>% 
       summarise(miss_non_covid = sum(c_across(`2015 Jan`:`2019 Dec`)),
-                miss_covid = sum(c_across(`2020 Mar`:`2020 Aug`))) %>% 
+                miss_covid = sum(c_across(`2020 Jan`:`2020 Aug`))) %>% 
       filter(miss_covid > 0 | miss_non_covid > 0) %>% 
-      mutate(miss_10_non_covid = if_else(miss_non_covid > 60/10, TRUE, FALSE))
+      mutate(miss_10_non_covid = if_else(miss_non_covid >= 60/10, TRUE, FALSE))
   }
 
 missRemove <- 
@@ -214,7 +241,7 @@ missRemove <-
       mutate(remove = if_else((miss_covid > 0 | miss_10_non_covid == TRUE), 
                               TRUE, FALSE)) %>% 
       summarise(miss_covid = sum(if_else(miss_covid > 0, TRUE, FALSE)),
-                miss_10_non_covid = sum(if_else(miss_non_covid > 60/10, TRUE,
+                miss_10_non_covid = sum(if_else(miss_non_covid >= 60/10, TRUE,
                                                 FALSE)),
                 miss_either = sum(if_else(remove == TRUE, TRUE, FALSE)))
   }
@@ -222,7 +249,8 @@ missRemove <-
 plan(cluster)
 
 full_data <- 
-  data_files[c(1:10,12)] %>% 
+  data_files[grep(pattern = "../data/prescribing_data/warfarin_ddd_nat.rds",
+                x = data_files, value = FALSE, invert = TRUE)] %>% 
   furrr::future_map(read_rds)
 
 n_practices <- 
@@ -270,11 +298,15 @@ n_practices %>%
          total_removed = missing_gp + miss_either + mape_over_50, 
          n_rem = n - total_removed) %>% 
   knitr::kable(booktabs = TRUE, linesep = "", 
-               col.names = c("drug", "n", "gp", "covid", "10_non_covid",
-                             "either", "mape >50", "total", "remain"),
+               col.names = c("Drug", "n", "GP", "COVID", "10% non-COVID",
+                             "Dispensing", "MAPE >50", "Total", "Remain"),
                caption = "Summary of GP practices removed for each drug.") %>% 
-  footnote(general = "The total is not always equal to the row sum, as a single practice may be missing both data in covid months and more than 10\\% of data in the non-covid months, but will only be excluded once.",
+  kableExtra::add_header_above(c(" "= 2, "Missing" = 4, "Removed" = 2, " " = 1)) %>% 
+  footnote(general = '"Dispensing" is not always equal to the sum of COVID and 10% non-COVID, as a single practice may be missing both data in covid months and more than 10% of data in the non-covid months, but will only be excluded once.',
            threeparttable = TRUE)
+
+
+
 ```
 
 
@@ -422,43 +454,47 @@ plan(sequential)
 ```
 
 
----
 
+## Warfarin
 
+```{r, oac-gen-trend, fig.cap="Warfarin as a percentage of all oral anticoagulant prescribing in Wales. Pink shading covers duration of Wales' \"stay at home\" order."}
+read_rds("../data/prescribing_data/warfarin_ddd.rds") %>% 
+  dplyr::group_by(datename) %>% 
+  dplyr::summarise(quantity = median(quantity, na.rm = TRUE)) %>% 
+  mutate(datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
+  ggplot(aes(x = datename)) + 
+  geom_rect(aes(xmin = dmy("01-03-2020"), xmax = dmy("31-07-2020"), 
+                ymin = -Inf, ymax = Inf),
+            fill = 'pink', col = 0, alpha = 0.03) +
+  geom_line(aes(y = quantity)) +
+  geom_vline(aes(xintercept = dmy("01-03-2020")), lty = 2, col = "red") +
+  scale_x_yearmonth() +
+  xlab("Date") +
+  ylab("Warfarin (percentage of all OACs)") +
+  ylim(0, 100) # Dyfrig's request
 
-
-## GEE results
-
-```{r, gee-analysis, eval = FALSE}
-ace <- 
-  differences %>% 
-  filter(drug == "ddd_ace") %>% 
-  group_by(datename) %>% 
-  slice(1:100, .preserve = TRUE) %>% 
-  left_join(filter(gp, year == 2020), by = c("regional_unit" = "practice_id")) %>% 
-  mutate(time_order = as.numeric(as.factor(datename)))
-
-ace_gee <- geeglm(prop ~ wimd2019, data = ace, id = regional_unit, waves = time_order, corstr = "ar1")
-
-summary(ace_gee)
 ```
 
 
 ## GLS Results
 
+### Analysis
+
 ```{r, gls-functions}
+drugs <- unique(differences$drug)
+
 #### Prep GLS data ####
 glsData <- function(data){
   df <- 
     differences %>% 
     filter(drug == data) %>% 
-    mutate(time_order = as.numeric(as.factor(datename)),
+    mutate(Month = as.numeric(as.factor(datename)),
            pct_change = 100*(prop - 1)) %>% 
-    select(c(regional_unit, time_order, pct_change))
+    select(c(regional_unit, Month, pct_change))
   
-  baseline <- subset(df, time_order == 2, -time_order)
-  baseline <- upData(baseline, rename = c(pct_change = "prop0"), print = FALSE)
-  followup <- subset(df, time_order > 2)
+  baseline <- subset(df, Month == 2, -Month)
+  baseline <- upData(baseline, rename = c(pct_change = "feb_diff"), print = FALSE)
+  followup <- subset(df, Month > 2)
   both <- merge(baseline, followup, by = c("regional_unit"))
   
   #### Join GP and GLS data ####
@@ -474,234 +510,454 @@ glsData <- function(data){
 }
 
 
+#### Redundancy analysis model ####
+redun <- list()
+for(i in drugs){
+  redun[[i]] <- redun(~hboard + dispensing + Month + feb_diff + wimd2019 + 
+                        PC1 + PC2 + PC3 + PC4 + PC5 + ngp + gp_load,
+                      data = glsData(i), r2 = .8, type = "adjusted") %>% 
+    .$Out
+}
+
+# No redundent variables
+
 #### GLS Analysis function ####
-bestGLS <- function(data){
-  cp <- list(corAR1, corExp, corCompSymm, corLin, corGaus, corSpher)
+bestGLS <- function(data, bootstrap = FALSE){
+  cp <- list(corExp, corCompSymm, corLin, corGaus, corSpher)
   z <- vector("list", length(cp))
   
   ### Fit models
   for(k in 1:length(cp)){
-    z[[k]] <- gls(pct_change ~ dispensing + hboard + rcs(time_order, 4) + rcs(prop0, 4) + 
-                    rcs(wimd2019, 4) + rcs(p_male, 4) + rcs(pm_65, 4) + 
-                    rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + rcs(ngp, 4) + 
-                    rcs(gp_load, 4),
+    z[[k]] <- gls(pct_change ~ rcs(Month, 4:7) +
+                    hboard + dispensing +
+                    rcs(wimd2019, 4) + 
+                    rcs(ngp, 4) + rcs(gp_load, 4) + 
+                    rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                    rcs(PC4, 4) + rcs(PC5, 4) +
+                    hboard:rcs(Month, 4:7) +
+                    dispensing:rcs(Month, 4:7) +
+                    rcs(wimd2019, 4):rcs(Month, 4:7) +
+                    rcs(ngp, 4):rcs(Month, 4:7) +
+                    rcs(gp_load, 4):rcs(Month, 4:7),
                   data = data,
-                  correlation = cp[[k]](form = ~time_order | regional_unit))
+                  correlation = cp[[k]](form = ~ Month | regional_unit))
   }
   
-  ### Select best model
-  anova(z[[1]], z[[2]], z[[3]], z[[4]], z[[5]], z[[6]])
-  best_model_aic <- 
-    anova(z[[1]], z[[2]], z[[3]], z[[4]], z[[5]], z[[6]]) %>% 
-    select(-call) %>% 
-    tibble() %>% 
-    arrange(AIC) %>% 
-    head(1) %>% 
-    .$Model
-
-  ### Fit best model
-  a <-  Gls(pct_change ~ dispensing + hboard + rcs(time_order, 4) + 
-              rcs(prop0, 4) + rcs(wimd2019, 4) + rcs(p_male, 4) + rcs(pm_65, 4) +               rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4)+ rcs(ngp, 4) + 
-                    rcs(gp_load, 4),
-            data = data, B = 1000, 
-            correlation = cp[[best_model_aic]](form = ~time_order | regional_unit))
+  arma_tab <- # Table for p and q values for corARMA()
+    tibble(p = 1:3, 
+           q = rep(0,3)) %>% 
+    mutate(model = row_number() + length(cp))
   
+  z <- c(z, map2(.x = arma_tab$p, .y = arma_tab$q, 
+                 .f = ~ if(.x > 0 | .y >0)
+                 { # p = 0 & q = 0 fails
+                   tryCatch(
+                     {gls(pct_change ~ rcs(Month, 4:7) +
+                            hboard + dispensing +
+                            rcs(wimd2019, 4) + 
+                            rcs(ngp, 4) + rcs(gp_load, 4) + 
+                            rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                            rcs(PC4, 4) + rcs(PC5, 4) +
+                            hboard:rcs(Month, 4:7) +
+                            dispensing:rcs(Month, 4:7) +
+                            rcs(wimd2019, 4):rcs(Month, 4:7) +
+                            rcs(ngp, 4):rcs(Month, 4:7) +
+                            rcs(gp_load, 4):rcs(Month, 4:7),
+                          data = data,
+                          correlation = corARMA(form = ~ Month|regional_unit, 
+                                                p=.x, q=.y))
+                     },
+                     error = function(cond){
+                       message(paste("Model causing error: p = ", 
+                                     .x, "q = ", .y))
+                       message("Original error message:")
+                       message(cond)
+                       return(NULL)
+                     },
+                     warning = function(cond){
+                       message(paste("Model causing warning: p = ", 
+                                     .x, "q = ", .y))
+                       message("Original warning message:")
+                       message(cond)
+                       return(NULL)
+                     }
+                   )
+                 }))
+  
+  ### Select best model
+  names(z) <- paste0("model", 1:length(z))
+  x <- z %>% 
+    map(summary)
+  
+  # Get metrics for each model
+  aic <- map_dfr(x, pluck("AIC"), .id = "model") 
+  bic <- map_dfr(x, pluck("BIC"), .id = "model")
+  log_lik <- map_dfr(x, pluck("logLik"), .id = "model")
+  
+  # Create table
+  mod_comparison <- 
+    bind_cols(metric = c("aic", "bic", "log_lik"), 
+              bind_rows(aic,bic,log_lik)) %>% 
+    pivot_longer(-metric) %>% 
+    pivot_wider(id_cols = name, values_from = value, names_from = metric) %>% 
+    rename(model = name) %>% 
+    mutate(model = as.numeric(str_remove_all(model, "model")))
+  
+  # Select best model
+  best_model_aic <- 
+    mod_comparison %>% 
+    arrange(aic, bic, desc(log_lik)) %>% 
+    head(1) %>% 
+    .$model
+  
+  
+  ### Fit best model
+  if(bootstrap == TRUE){  
+    if(best_model_aic <= 6){
+      a <-  Gls(pct_change ~ rcs(Month, 4:7) +
+                  hboard + dispensing +  
+                  rcs(wimd2019, 4) + 
+                  rcs(ngp, 4) + rcs(gp_load, 4) + 
+                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                  rcs(PC4, 4) + rcs(PC5, 4) +
+                  hboard:rcs(Month, 4:7) +
+                  dispensing:rcs(Month, 4:7) +
+                  rcs(wimd2019, 4):rcs(Month, 4:7) +
+                  rcs(ngp, 4):rcs(Month, 4:7) +
+                  rcs(gp_load, 4):rcs(Month, 4:7),
+                data = data, B = 1000,
+                correlation = 
+                  cp[[best_model_aic]](form = ~ Month | regional_unit))
+      }
+    else{
+      a <-  Gls(pct_change ~ rcs(Month, 4:7) +
+                  hboard + dispensing +  
+                  rcs(wimd2019, 4) + 
+                  rcs(ngp, 4) + rcs(gp_load, 4) + 
+                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                  rcs(PC4, 4) + rcs(PC5, 4) +
+                  hboard:rcs(Month, 4:7) +
+                  dispensing:rcs(Month, 4:7) +
+                  rcs(wimd2019, 4):rcs(Month, 4:7) +
+                  rcs(ngp, 4):rcs(Month, 4:7) +
+                  rcs(gp_load, 4):rcs(Month, 4:7),
+                data = data, B = 1000,
+                correlation = 
+                  corARMA(form = ~ Month | regional_unit, 
+                          p = filter(arma_tab, model == best_model_aic)$p, 
+                          q = filter(arma_tab, model == best_model_aic)$q))
+      }
+  }
+  else{
+    if(best_model_aic <= 6){
+      a <- Gls(pct_change ~ rcs(Month, 4:7) +
+                 hboard + dispensing +  
+                 rcs(wimd2019, 4) + 
+                 rcs(ngp, 4) + rcs(gp_load, 4) + 
+                 rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                 rcs(PC4, 4) + rcs(PC5, 4) +
+                 hboard:rcs(Month, 4:7) +
+                 dispensing:rcs(Month, 4:7) +
+                 rcs(wimd2019, 4):rcs(Month, 4:7) +
+                 rcs(ngp, 4):rcs(Month, 4:7) +
+                 rcs(gp_load, 4):rcs(Month, 4:7),
+               data = data,
+               correlation = 
+                 cp[[best_model_aic]](form = ~ Month | regional_unit))
+    }
+    else{
+      a <- Gls(pct_change ~ rcs(Month, 4:7) +
+                  hboard + dispensing +  
+                  rcs(wimd2019, 4) + 
+                  rcs(ngp, 4) + rcs(gp_load, 4) + 
+                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
+                  rcs(PC4, 4) + rcs(PC5, 4) +
+                  hboard:rcs(Month, 4:7) +
+                  dispensing:rcs(Month, 4:7) +
+                  rcs(wimd2019, 4):rcs(Month, 4:7) +
+                  rcs(ngp, 4):rcs(Month, 4:7) +
+                  rcs(gp_load, 4):rcs(Month, 4:7),
+               data = data,
+               correlation = 
+                 corARMA(form = ~ Month | regional_unit, 
+                         p = filter(arma_tab, model == best_model_aic)$p, 
+                         q = filter(arma_tab, model == best_model_aic)$q))
+    }
+  }
   return(a)
 }
+
 
 #### GLS Assumption Checking ####
 glsAssump <- function(model, data){
   data$resid <- r <- resid(model); data$fitted <- fitted(model)
   y1 <- ylab("Residuals")
-  p1 <- ggplot(data, aes(x = fitted, y = resid)) + geom_point() + 
-    facet_grid(~hboard) + y1
-  p2 <- ggplot(data, aes(x = prop0, y = resid)) + geom_point() + y1
-  p3 <- ggplot(data, aes(x = time_order, y = resid)) + y1 + 
+  p1 <- ggplot(data, aes(x = fitted, y = resid)) + geom_point(alpha = .1) + y1
+  p2 <- ggplot(data, aes(x = feb_diff, y = resid)) + geom_point(alpha = .1) + y1
+  p3 <- ggplot(data, aes(x = Month, y = resid)) + y1 + 
     stat_summary(fun.data = "mean_sdl", geom = "smooth")
-  p4 <- ggplot(data, aes(sample = resid)) + stat_qq() + 
+  p4 <- ggplot(data, aes(sample = resid)) + stat_qq(alpha = .1) + 
     geom_abline(intercept = mean(r), slope = sd(r)) + y1
   
   gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
 }
 
 #### GLS Estimated Effects ####
-glsEffects <- function(model, name){
-  p1 <- ggplot(Predict(model, time_order, dispensing, conf.int = FALSE),
-               adj.subitle = FALSE, legend.position = "top", )
-  p2 <- ggplot(Predict(model, prop0), adj.subtitle = FALSE)
-  p3 <- ggplot(Predict(model, pm_65), adj.subtitle = FALSE)
-  p4 <- ggplot(Predict(model, p_male), adj.subtitle = FALSE)
-  p5 <- ggplot(Predict(model, wimd2019), adj.subtitle = FALSE)
-  p6 <- ggplot(Predict(model, PC1), adj.subtitle = FALSE)
-  p7 <- ggplot(Predict(model, PC2), adj.subtitle = FALSE)
-  p8 <- ggplot(Predict(model, PC3), adj.subtitle = FALSE)
-  p9 <- ggplot(Predict(model, hboard), adj.subtitle = FALSE)
-  p10 <- ggplot(Predict(model, ngp), adj.subtitle = FALSE)
-  p11 <- ggplot(Predict(model, gp_load), adj.subtitle = FALSE)
-  gridExtra::grid.arrange(p1,p2,p3,p4, ncol = 2)
-  gridExtra::grid.arrange(p5,p6,p7,p8, ncol = 2)
-  gridExtra::grid.arrange(p9,p10,p11, ncol = 2)
-  
-  capture.output(print(model))[16:53] %>% 
-    read_table(., col_names = c(" ", "Coef", "S.E.", "t", "Pr(>|t|)")) %>% 
-    kable(booktabs = TRUE, linesep = "", digits = 2,
-               caption = paste(name, "coefficents")) %>% 
-    kable_styling(bootstrap_options = "striped") %>% 
-    print()
-  
-  plot(anova(model))
+percentiles <- function(data, var){
+  # return vector of 5th, 25th, 50th, 75th, and 95th percentile
+  var <- enquo(var)
+  data %>% 
+    summarise(enframe(stats::quantile(!!var, c(.05, .25, .5, .75, .95)), 
+                      "Percentile", "value"), .groups = "drop") %>% 
+    mutate(value = round(value)) %>% .$value
+}
 
-  model %>% 
-    anova() %>% 
-    kable(booktabs = TRUE, linesep = "", digits = 2,
-          caption = paste(name, "anova")) %>% 
-    add_indent(positions = c(4,6,8,10,12,14,16,18,20,22)) %>% 
-    kable_styling(bootstrap_options = "striped") %>% 
-    print()
+# dodge <- position_dodge(width = .25)
+predictPlot <- function(data = ., groups, names){
+  groups <- enquo(groups)
+  data %>% 
+    tibble() %>% 
+    group_by(Month, !!groups) %>% 
+    summarise(yhat = mean(yhat)) %>% 
+    mutate(groups = as.factor(!!groups)) %>% 
+    ggplot(aes(x = Month, y = yhat, group = groups)) +
+    geom_line(aes(col = groups)) +
+    scale_colour_viridis_d(name = names) +
+    scale_fill_viridis_d(name = names) +
+    theme(legend.position = "top") +
+    ylab(bquote(~X~hat(beta))) +
+    ggthemes::theme_hc()
+}
+
+glsEffects <- function(model, name, data){
   
-  # time_order and prop0 dominate so not useful
-  # n <- nomogram(model, abbrev = TRUE)
-  # plot(n, )
+  Name <- case_when(name == "all_drugs" ~ "All",
+                    name == "ace" ~ "ACEi",
+                    name == "adreno" ~ "BAA",
+                    name == "cortico" ~ "Inhaled \ncortico",
+                    name == "hcq" ~ "HCQ",
+                    name == "nsaid" ~ "NSAIDs",
+                    name == "oral_contra" ~ "Oral\ncontra",
+                    name == "paracet" ~ "Paracet",
+                    name == "ssri" ~ "SSRIs",
+                    name == "vitd" ~ "Vit D",
+                    name == "warfarin" ~ "Warfarin")
+  
+  cat("\n\n")
+
+  #### Plot interactions #### not including month*ngp as none significant
+  p1 <- Predict(model, Month, dispensing, hboard, conf.int = .95) %>% 
+    predictPlot(., groups = hboard, "Health board")
+  gridExtra::grid.arrange(p1,nrow = 1, newpage = TRUE) # Effects 1
+  cat("\n\n")
+  
+  p2 <- Predict(model, Month,  dispensing, hboard, conf.int = .95) %>% 
+    predictPlot(., groups = dispensing, "Dispensing")
+  gridExtra::grid.arrange(p2,nrow = 1, newpage = TRUE) # Effects 2
+  cat("\n\n")
+  
+  p1 <- Predict(model, Month, dispensing, hboard,
+                wimd2019 = percentiles(data, wimd2019),
+                conf.int = .95) %>% 
+        group_by(Month, wimd2019) %>% 
+    summarise(yhat = mean(yhat)) %>% 
+    predictPlot(., groups = wimd2019, "WIMD")
+    gridExtra::grid.arrange(p1, nrow = 1, newpage = TRUE) # Effects 3
+  cat("\n\n")
+  
+  p1 <- Predict(model, Month, dispensing, hboard,
+                ngp = percentiles(data, ngp),
+                conf.int = .95) %>% 
+    predictPlot(., groups = ngp, "Number of GPs")
+  gridExtra::grid.arrange(p1, ncol = 1, newpage = TRUE) # Effects 5
+  cat("\n\n")
+  
+  p2 <- Predict(model, Month, dispensing, hboard,
+                gp_load = percentiles(data, gp_load),
+                conf.int = .95) %>% 
+    predictPlot(., groups = gp_load, "GP load")
+  gridExtra::grid.arrange(p2, nrow = 1, newpage = TRUE) # Effects 4
+  cat("\n\n")
+  
+  
+  p1 <- Predict(model, Month, dispensing, hboard,
+                PC1 = percentiles(data, PC1),
+                conf.int = .95) %>% 
+    predictPlot(., groups = PC1, "PC1")
+  p2 <- Predict(model, Month, dispensing, hboard,
+                PC2 = percentiles(data, PC2),
+                conf.int = .95) %>% 
+    predictPlot(., groups = PC2, "PC2")
+  p3 <- Predict(model, Month, dispensing, hboard,
+                PC3 = percentiles(data, PC3),
+                conf.int = .95) %>% 
+    predictPlot(., groups = PC3, "PC3")
+  p4 <- Predict(model, Month, dispensing, hboard,
+                PC4 = percentiles(data, PC4),
+                conf.int = .95) %>% 
+    predictPlot(., groups = PC4, "PC4")
+  gridExtra::grid.arrange(p1,p2,p3,p4, ncol = 2, newpage = TRUE) # Effects 6
+  cat("\n\n")
+  
+  
+  # #### ANOVA plot ####
+  # p <- 
+  #   capture.output(anova(model))[4:41] %>%
+  #   read_fwf(fwf_empty(., col_names = c("Factor", "Chi-Square", "d.f.", "P"))) %>% 
+  #   mutate(Factor = 
+  #            str_remove_all(Factor, 
+  #                           c(OPEN_PAREN %R% "Factor" %R% PLUS %R% 
+  #                               "Higher Order Factors" %R% CLOSE_PAREN))) %>% 
+  #   filter(!str_detect(Factor, "Nonlinear") &
+  #            !str_detect(Factor, "TOTAL") &
+  #            Factor != "All Interactions",
+  #          !str_detect(Factor, c("f" %R% OPEN_PAREN %R% "A,B"))) %>% 
+  #   ggplot(aes(x = `Chi-Square`-`d.f.`, 
+  #              y = reorder(Factor, X = `Chi-Square`-`d.f.`))) +
+  #   geom_point(aes(col = 
+  #                    as.factor(if_else(as.numeric(str_remove_all(P, "<"))<.05, 
+  #                                      TRUE,FALSE)))) +
+  #   scale_color_discrete(name = "P < .05") + 
+  #   xlab(expression(chi^2-"d.f.")) +
+  #   ylab(NULL) +
+  #   ggthemes::theme_few() 
+  # 
+  # gridExtra::grid.arrange(p, newpage = TRUE)
+  # cat("\n\n")
+  
+  p <- anova(model, rm.other = list("Month"), trans = sqrt,
+             tol = 1e-10, dec.chisq = 2, dec.p = 2) %>% 
+    plot()
+  
+  p
+  
+  
+
+  #### ANOVA Table ####
+  # model %>% 
+  #   anova() %>% 
+  #   kable(booktabs = TRUE, linesep = "", digits = 2,
+  #         caption = paste(Name, "Wald z-test statistics")) %>% 
+  #   # add_indent(positions = c(3,5,6,8,10,11,13,15,17,19,21,23,25,27,28,30:34)) %>% 
+  #   kable_styling(latex_options = c("striped", "HOLD_position", "repeat_header")) %>% 
+  #   print()
+
   cat("\n\n")
 }
 
-
-drugs <- unique(differences$drug)
-
-gls_analysis_fig_cap <- 
-  paste(paste(drugs, "assumptions"), paste(drugs, "effects1"), 
-        paste(drugs, "effects2"), paste(drugs, "effects3"), 
-        paste(drugs, "anova"), paste(drugs, "nomogram"))
 
 gls_analysis_fig_cap <- NULL
 for (i in 1:length(drugs)) {
   gls_analysis_fig_cap <- 
     c(gls_analysis_fig_cap, 
-      paste(drugs[i], c("assumptions", "effects1", "effects2", "effects3",
-                        "anova", "nomogram")))
+      paste(drugs[i], c("Assumptions", "Health board effects.", "Dispensing status effect.", "WIMD effects. Lines represent the 5th, 25th, 50th, 75th, and 95th quantiles.", "Number of GPs effects. Lines represent the 5th, 25th, 50th, 75th, and 95th quantiles.", "Patients per GP effects. Lines represent the 5th, 25th, 50th, 75th, and 95th quantiles.", "Patient related variable principal components 1-4 effects. Lines represent the 5th, 25th, 50th, 75th, and 95th quantiles.", "Relative importance of effects.")))
 }
+
+
 
 ```
 
 
 
-```{r, gls-analysis, results="asis", fig.cap=gls_analysis_fig_cap}
+```{r, gls-analysis-save, results="asis", fig.cap=gls_analysis_fig_cap, warning=FALSE, message=FALSE, eval = FALSE}
+#### gls-analysis-save ####
 drugs <- unique(differences$drug)
 
 best_models <- list()
+best_bs_models <- list()
 
+dd <- NULL
 for(i in drugs){
-  cat("###", (i), "\n\n")
   gls_data <- glsData(i)
   dd <- datadist(gls_data)
   options(datadist = "dd")
   best_gls <- bestGLS(gls_data)
-  cat("####", "Assumptions\n\n")
-  glsAssump(best_gls, gls_data)
+  best_bs_gls <- bestGLS(gls_data, TRUE)
+  rm(dd)
+  best_models[[i]] <-
+    best_gls
+  best_bs_models[[i]] <- 
+    best_bs_gls
+  options(datadist = NULL)
+}
+
+write_rds(best_models, "../data/gls/best_models.rds")
+write_rds(best_bs_models, "../data/gls/best_bs_models.rds")
+```
+
+
+```{r, gls-analysis-read}
+#### gls-analysis-read ####
+best_models <- read_rds("../data/gls/best_models.rds")
+best_bs_models <- read_rds("../data/gls/best_bs_models.rds")
+```
+
+
+```{r, gls-effects, results="asis", fig.cap=gls_analysis_fig_cap, dependson="gls-functions"}
+#### gls-effects ####
+drugs <- unique(differences$drug)
+
+dd <- NULL
+for(i in 1:length(best_bs_models)){
+  cat("####", (drugs[i]), "\n\n")
+  cat("#####", "Assumptions\n\n")
+  gls_data <- glsData(drugs[i])
+  dd <- datadist(gls_data)
+  options(datadist = "dd")
+  glsAssump(best_bs_models[[i]], gls_data)
   cat("\n\n")
-  cat("####", "Effects\n\n")
-  glsEffects(best_gls, i)
+  cat("#####", "Effects\n\n")
+  glsEffects(best_bs_models[[i]], drugs[i], gls_data)
   rm(dd)
   cat("\n\n")
-  best_models[[i]] <- 
-    best_gls
-}
-
-best_model_coefs <- 
-  best_models %>% 
-  map(~capture.output(print(.))[16:53] %>% 
-        read_table(col_names = c("Coef", "Est", "S.E.", "t", "Pr(>|t|)"))) %>%
-  map_dfr(as_tibble, .id = "drug")
-
-best_model_corr <- 
-  best_models %>% 
-  map(~list(str = capture.output(print(.))[55],
-            measure = capture.output(print(.))[58],
-            value = capture.output(print(.))[59]))
-```
-
-
-```{r, gls-coef-tab-signif, results="asis"}
-
-best_model_coefs %>% 
-  mutate(`Pr(>|t|)` = as.numeric(str_remove_all(string = `Pr(>|t|)`, "<")),
-         Est = case_when(`Pr(>|t|)` < .05 ~ 
-                           paste0(printnum(Est, digits = 2), "*"),
-                         `Pr(>|t|)` >= .05 ~
-                           as.character(printnum(Est, digits = 2, format = "f")))) %>%
-  kable(booktabs = TRUE, linesep = "", digits = 2, align = "r",
-        caption = "Summary of GLS coefficents") %>% 
-  kable_styling(bootstrap_options = "striped") %>% 
-  landscape() %>% 
-  print()
-```
-
-
-```{r, gls-coef-tab-ci, results="asis"}
-
-best_model_coefs %>% 
-  mutate(`Pr(>|t|)` = as.numeric(str_remove_all(string = `Pr(>|t|)`, "<")),
-         Est = paste0(printnum(Est, digits = 2), "[", 
-                      printnum(Est - 1.96*S.E., digits = 2), ",", 
-                      printnum(Est + 1.96*S.E., digits = 2), "]")) %>% 
-  pivot_wider(id_cols = Coef, names_from = drug, values_from = Est) %>% 
-  kable(booktabs = TRUE, linesep = "", digits = 2, align = "r",
-        caption = "Summary of GLS coefficents [95% CI]") %>% 
-  kable_styling(bootstrap_options = "striped") %>% 
-  landscape() %>% 
-  print()
-```
-
-
-```{r, gls-coef-plot}
-coefs <- unique(best_model_coefs$Coef)
-
-coef_plot_order <- 
-  list(coefs[1:2],coefs[3:8], coefs[9:20], coefs[21:32],coefs[33:38])
-
-
-for (i in 1:length(coef_plot_order)) {
-  p <- best_model_coefs %>% 
-    filter(Coef %in% coef_plot_order[[i]]) %>% 
-    ggplot(aes(y = drug, group = as.factor(str_count(Coef, "'")), 
-                                           col = drug)) +
-    geom_point(aes(x = Est, shape = as.factor(str_count(Coef, "'"))), 
-               position = position_dodge(width=.75)) +
-    geom_errorbarh(aes(xmin = Est - 1.96* S.E., xmax = Est + 1.96* S.E.,
-                       height = 0),
-                   position = position_dodge(width=.75), ) +
-    geom_vline(aes(xintercept = 0), col = "grey") +
-    facet_wrap(~str_remove_all(Coef, "'"), scales = "free_x", ) + 
-    guides(shape = "legend", colour = "none")
-  
-  print(p)
-  
+  options(datadist = NULL)
 }
 
 ```
 
 
+### Summary of effects
 
-
-## Warfarin
-
-```{r, oac-gen-trend, fig.cap="Warfarin as a percentage of all oral anticoagulant prescribing in Wales. Pink shading covers duration of Wales' \"stay at home\" order."}
-read_rds("../data/prescribing_data/warfarin_ddd.rds") %>% 
-  dplyr::group_by(datename) %>% 
-  dplyr::summarise(quantity = median(quantity, na.rm = TRUE)) %>% 
-  mutate(datename = yearmonth(dmy(paste0("28-", datename)))) %>% 
-  ggplot(aes(x = datename)) + 
-  geom_line(aes(y = quantity)) +
-  geom_vline(aes(xintercept = dmy("01-03-2020")), lty = 2, col = "red") +
-  geom_rect(aes(xmin = dmy("01-03-2020"), xmax = dmy("31-07-2020"), 
-                ymin = -Inf, ymax = Inf),
-            fill = 'pink', col = 0, alpha = 0.03) +
-  scale_x_yearmonth() +
-  xlab("Date") +
-  ylab("Warfarin (percentage of all OACs)") +
-  ylim(0, 100) # Dyfrig's request
-
+```{r, gls-anova-summary-tab}
+#### gls-anova-summary-tab ####
+best_bs_models %>% 
+  map(~anova(., tol = 1e-10)) %>% 
+  map(~as_tibble(x = ., rownames = "Coef")) %>% 
+  map(as.matrix) %>% 
+  map(as_tibble) %>% 
+  bind_rows(.id= "drug") %>% 
+  mutate(across(`Chi-Square`:P, as.numeric)) %>% 
+  select(-c(`Chi-Square`, d.f.)) %>% 
+  filter(!str_detect(Coef, "Nonlinear") &
+           !str_detect(Coef, "TOTAL") &
+           !str_detect(Coef,"All Interactions"),
+         !str_detect(Coef, c("f" %R% OPEN_PAREN %R% "A,B"))) %>%
+  pivot_wider(names_from = drug, values_from = P) %>% 
+  mutate(across(ace:warfarin, ~printnum(., zero = FALSE)),
+         Coef = str_remove_all(Coef, OPEN_PAREN %R% "Factor" %R% PLUS %R% 
+                                 "Higher Order Factors" %R% CLOSE_PAREN)) %>% 
+  select(Coef, all_drugs, everything()) %>% 
+  kable(booktabs = TRUE, linesep = "",
+        caption = paste("Wald test p-values"))%>% 
+  kable_styling(latex_options = c("striped", "HOLD_position", "repeat_header")) %>% 
+  landscape()
 ```
+
+
+
+### Full tables
+
+```{r, gls-full-model-table, results="asis"}
+options(prType="latex")
+
+best_bs_models %>% 
+  map(~print(., latex=TRUE))
+
+options(prType="plain")
+```
+
+
+
 
 
 
