@@ -97,6 +97,10 @@ differences <-
 
 plan(sequential)
 
+
+drugs <- unique(differences$drug)
+
+
 # Seed for random number generation
 set.seed(32)
 knitr::opts_chunk$set(cache.extra = knitr::rand_seed, cache = TRUE, 
@@ -311,7 +315,6 @@ n_practices %>%
 
 
 ```{r, big-discrepacies, eval=FALSE}
-drugs <- unique(differences$drug)
 
 bigDiscreps <- function(x){
   message(x)
@@ -481,7 +484,6 @@ read_rds("../data/prescribing_data/warfarin_ddd.rds") %>%
 ### Analysis
 
 ```{r, gls-functions}
-drugs <- unique(differences$drug)
 
 #### Prep GLS data ####
 glsData <- function(data){
@@ -490,201 +492,15 @@ glsData <- function(data){
     filter(drug == data) %>% 
     mutate(Month = as.numeric(as.factor(datename)),
            pct_change = 100*(prop - 1)) %>% 
-    select(c(regional_unit, Month, pct_change))
-  
-  baseline <- subset(df, Month == 2, -Month)
-  baseline <- upData(baseline, rename = c(pct_change = "feb_diff"), print = FALSE)
-  followup <- subset(df, Month > 2)
-  both <- merge(baseline, followup, by = c("regional_unit"))
-  
-  #### Join GP and GLS data ####
-  both <- 
-    both %>% 
+    select(c(regional_unit, Month, pct_change)) %>% 
+    filter(Month > 2) %>% 
     left_join(gp_2020, by = "regional_unit") %>% 
     mutate(gp_load = npat / ngp)
   
-  dd <- datadist(both)
+  dd <- datadist(df)
   options(datadist = "dd")
   
-  return(both)
-}
-
-
-#### Redundancy analysis model ####
-redun <- list()
-for(i in drugs){
-  redun[[i]] <- redun(~hboard + dispensing + Month + feb_diff + wimd2019 + 
-                        PC1 + PC2 + PC3 + PC4 + PC5 + ngp + gp_load,
-                      data = glsData(i), r2 = .8, type = "adjusted") %>% 
-    .$Out
-}
-
-# No redundent variables
-
-#### GLS Analysis function ####
-bestGLS <- function(data, bootstrap = FALSE){
-  cp <- list(corExp, corCompSymm, corLin, corGaus, corSpher)
-  z <- vector("list", length(cp))
-  
-  ### Fit models
-  for(k in 1:length(cp)){
-    z[[k]] <- gls(pct_change ~ rcs(Month, 4:7) +
-                    hboard + dispensing +
-                    rcs(wimd2019, 4) + 
-                    rcs(ngp, 4) + rcs(gp_load, 4) + 
-                    rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                    rcs(PC4, 4) + rcs(PC5, 4) +
-                    hboard:rcs(Month, 4:7) +
-                    dispensing:rcs(Month, 4:7) +
-                    rcs(wimd2019, 4):rcs(Month, 4:7) +
-                    rcs(ngp, 4):rcs(Month, 4:7) +
-                    rcs(gp_load, 4):rcs(Month, 4:7),
-                  data = data,
-                  correlation = cp[[k]](form = ~ Month | regional_unit))
-  }
-  
-  arma_tab <- # Table for p and q values for corARMA()
-    tibble(p = 1:3, 
-           q = rep(0,3)) %>% 
-    mutate(model = row_number() + length(cp))
-  
-  z <- c(z, map2(.x = arma_tab$p, .y = arma_tab$q, 
-                 .f = ~ if(.x > 0 | .y >0)
-                 { # p = 0 & q = 0 fails
-                   tryCatch(
-                     {gls(pct_change ~ rcs(Month, 4:7) +
-                            hboard + dispensing +
-                            rcs(wimd2019, 4) + 
-                            rcs(ngp, 4) + rcs(gp_load, 4) + 
-                            rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                            rcs(PC4, 4) + rcs(PC5, 4) +
-                            hboard:rcs(Month, 4:7) +
-                            dispensing:rcs(Month, 4:7) +
-                            rcs(wimd2019, 4):rcs(Month, 4:7) +
-                            rcs(ngp, 4):rcs(Month, 4:7) +
-                            rcs(gp_load, 4):rcs(Month, 4:7),
-                          data = data,
-                          correlation = corARMA(form = ~ Month|regional_unit, 
-                                                p=.x, q=.y))
-                     },
-                     error = function(cond){
-                       message(paste("Model causing error: p = ", 
-                                     .x, "q = ", .y))
-                       message("Original error message:")
-                       message(cond)
-                       return(NULL)
-                     },
-                     warning = function(cond){
-                       message(paste("Model causing warning: p = ", 
-                                     .x, "q = ", .y))
-                       message("Original warning message:")
-                       message(cond)
-                       return(NULL)
-                     }
-                   )
-                 }))
-  
-  ### Select best model
-  names(z) <- paste0("model", 1:length(z))
-  x <- z %>% 
-    map(summary)
-  
-  # Get metrics for each model
-  aic <- map_dfr(x, pluck("AIC"), .id = "model") 
-  bic <- map_dfr(x, pluck("BIC"), .id = "model")
-  log_lik <- map_dfr(x, pluck("logLik"), .id = "model")
-  
-  # Create table
-  mod_comparison <- 
-    bind_cols(metric = c("aic", "bic", "log_lik"), 
-              bind_rows(aic,bic,log_lik)) %>% 
-    pivot_longer(-metric) %>% 
-    pivot_wider(id_cols = name, values_from = value, names_from = metric) %>% 
-    rename(model = name) %>% 
-    mutate(model = as.numeric(str_remove_all(model, "model")))
-  
-  # Select best model
-  best_model_aic <- 
-    mod_comparison %>% 
-    arrange(aic, bic, desc(log_lik)) %>% 
-    head(1) %>% 
-    .$model
-  
-  
-  ### Fit best model
-  if(bootstrap == TRUE){  
-    if(best_model_aic <= 6){
-      a <-  Gls(pct_change ~ rcs(Month, 4:7) +
-                  hboard + dispensing +  
-                  rcs(wimd2019, 4) + 
-                  rcs(ngp, 4) + rcs(gp_load, 4) + 
-                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                  rcs(PC4, 4) + rcs(PC5, 4) +
-                  hboard:rcs(Month, 4:7) +
-                  dispensing:rcs(Month, 4:7) +
-                  rcs(wimd2019, 4):rcs(Month, 4:7) +
-                  rcs(ngp, 4):rcs(Month, 4:7) +
-                  rcs(gp_load, 4):rcs(Month, 4:7),
-                data = data, B = 1000,
-                correlation = 
-                  cp[[best_model_aic]](form = ~ Month | regional_unit))
-      }
-    else{
-      a <-  Gls(pct_change ~ rcs(Month, 4:7) +
-                  hboard + dispensing +  
-                  rcs(wimd2019, 4) + 
-                  rcs(ngp, 4) + rcs(gp_load, 4) + 
-                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                  rcs(PC4, 4) + rcs(PC5, 4) +
-                  hboard:rcs(Month, 4:7) +
-                  dispensing:rcs(Month, 4:7) +
-                  rcs(wimd2019, 4):rcs(Month, 4:7) +
-                  rcs(ngp, 4):rcs(Month, 4:7) +
-                  rcs(gp_load, 4):rcs(Month, 4:7),
-                data = data, B = 1000,
-                correlation = 
-                  corARMA(form = ~ Month | regional_unit, 
-                          p = filter(arma_tab, model == best_model_aic)$p, 
-                          q = filter(arma_tab, model == best_model_aic)$q))
-      }
-  }
-  else{
-    if(best_model_aic <= 6){
-      a <- Gls(pct_change ~ rcs(Month, 4:7) +
-                 hboard + dispensing +  
-                 rcs(wimd2019, 4) + 
-                 rcs(ngp, 4) + rcs(gp_load, 4) + 
-                 rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                 rcs(PC4, 4) + rcs(PC5, 4) +
-                 hboard:rcs(Month, 4:7) +
-                 dispensing:rcs(Month, 4:7) +
-                 rcs(wimd2019, 4):rcs(Month, 4:7) +
-                 rcs(ngp, 4):rcs(Month, 4:7) +
-                 rcs(gp_load, 4):rcs(Month, 4:7),
-               data = data,
-               correlation = 
-                 cp[[best_model_aic]](form = ~ Month | regional_unit))
-    }
-    else{
-      a <- Gls(pct_change ~ rcs(Month, 4:7) +
-                  hboard + dispensing +  
-                  rcs(wimd2019, 4) + 
-                  rcs(ngp, 4) + rcs(gp_load, 4) + 
-                  rcs(PC1, 4) + rcs(PC2, 4) + rcs(PC3, 4) + 
-                  rcs(PC4, 4) + rcs(PC5, 4) +
-                  hboard:rcs(Month, 4:7) +
-                  dispensing:rcs(Month, 4:7) +
-                  rcs(wimd2019, 4):rcs(Month, 4:7) +
-                  rcs(ngp, 4):rcs(Month, 4:7) +
-                  rcs(gp_load, 4):rcs(Month, 4:7),
-               data = data,
-               correlation = 
-                 corARMA(form = ~ Month | regional_unit, 
-                         p = filter(arma_tab, model == best_model_aic)$p, 
-                         q = filter(arma_tab, model == best_model_aic)$q))
-    }
-  }
-  return(a)
+  return(df)
 }
 
 
@@ -693,13 +509,14 @@ glsAssump <- function(model, data){
   data$resid <- r <- resid(model); data$fitted <- fitted(model)
   y1 <- ylab("Residuals")
   p1 <- ggplot(data, aes(x = fitted, y = resid)) + geom_point(alpha = .1) + y1
-  p2 <- ggplot(data, aes(x = feb_diff, y = resid)) + geom_point(alpha = .1) + y1
+  # p2 <- ggplot(data, aes(x = feb_diff, y = resid)) + geom_point(alpha = .1) + y1
   p3 <- ggplot(data, aes(x = Month, y = resid)) + y1 + 
     stat_summary(fun.data = "mean_sdl", geom = "smooth")
   p4 <- ggplot(data, aes(sample = resid)) + stat_qq(alpha = .1) + 
     geom_abline(intercept = mean(r), slope = sd(r)) + y1
   
-  gridExtra::grid.arrange(p1, p2, p3, p4, ncol = 2)
+  gridExtra::grid.arrange(p1, #p2, 
+                          p3, p4, ncol = 2)
 }
 
 #### GLS Estimated Effects ####
@@ -780,24 +597,24 @@ glsEffects <- function(model, name, data){
   cat("\n\n")
   
   
-  p1 <- Predict(model, Month, dispensing, hboard,
-                PC1 = percentiles(data, PC1),
-                conf.int = .95) %>% 
-    predictPlot(., groups = PC1, "PC1")
-  p2 <- Predict(model, Month, dispensing, hboard,
-                PC2 = percentiles(data, PC2),
-                conf.int = .95) %>% 
-    predictPlot(., groups = PC2, "PC2")
-  p3 <- Predict(model, Month, dispensing, hboard,
-                PC3 = percentiles(data, PC3),
-                conf.int = .95) %>% 
-    predictPlot(., groups = PC3, "PC3")
-  p4 <- Predict(model, Month, dispensing, hboard,
-                PC4 = percentiles(data, PC4),
-                conf.int = .95) %>% 
-    predictPlot(., groups = PC4, "PC4")
-  gridExtra::grid.arrange(p1,p2,p3,p4, ncol = 2, newpage = TRUE) # Effects 6
-  cat("\n\n")
+  # p1 <- Predict(model, Month, dispensing, hboard,
+  #               PC1 = percentiles(data, PC1),
+  #               conf.int = .95) %>% 
+  #   predictPlot(., groups = PC1, "PC1")
+  # p2 <- Predict(model, Month, dispensing, hboard,
+  #               PC2 = percentiles(data, PC2),
+  #               conf.int = .95) %>% 
+  #   predictPlot(., groups = PC2, "PC2")
+  # p3 <- Predict(model, Month, dispensing, hboard,
+  #               PC3 = percentiles(data, PC3),
+  #               conf.int = .95) %>% 
+  #   predictPlot(., groups = PC3, "PC3")
+  # p4 <- Predict(model, Month, dispensing, hboard,
+  #               PC4 = percentiles(data, PC4),
+  #               conf.int = .95) %>% 
+  #   predictPlot(., groups = PC4, "PC4")
+  # gridExtra::grid.arrange(p1,p2,p3,p4, ncol = 2, newpage = TRUE) # Effects 6
+  # cat("\n\n")
   
   
   # #### ANOVA plot ####
@@ -830,8 +647,6 @@ glsEffects <- function(model, name, data){
     plot()
   
   p
-  
-  
 
   #### ANOVA Table ####
   # model %>% 
@@ -858,34 +673,6 @@ for (i in 1:length(drugs)) {
 ```
 
 
-
-```{r, gls-analysis-save, results="asis", fig.cap=gls_analysis_fig_cap, warning=FALSE, message=FALSE, eval = FALSE}
-#### gls-analysis-save ####
-drugs <- unique(differences$drug)
-
-best_models <- list()
-best_bs_models <- list()
-
-dd <- NULL
-for(i in drugs){
-  gls_data <- glsData(i)
-  dd <- datadist(gls_data)
-  options(datadist = "dd")
-  best_gls <- bestGLS(gls_data)
-  best_bs_gls <- bestGLS(gls_data, TRUE)
-  rm(dd)
-  best_models[[i]] <-
-    best_gls
-  best_bs_models[[i]] <- 
-    best_bs_gls
-  options(datadist = NULL)
-}
-
-write_rds(best_models, "../data/gls/best_models.rds")
-write_rds(best_bs_models, "../data/gls/best_bs_models.rds")
-```
-
-
 ```{r, gls-analysis-read}
 #### gls-analysis-read ####
 best_models <- read_rds("../data/gls/best_models.rds")
@@ -895,7 +682,6 @@ best_bs_models <- read_rds("../data/gls/best_bs_models.rds")
 
 ```{r, gls-effects, results="asis", fig.cap=gls_analysis_fig_cap, dependson="gls-functions"}
 #### gls-effects ####
-drugs <- unique(differences$drug)
 
 dd <- NULL
 for(i in 1:length(best_bs_models)){
@@ -938,7 +724,7 @@ best_bs_models %>%
                                  "Higher Order Factors" %R% CLOSE_PAREN)) %>% 
   select(Coef, all_drugs, everything()) %>% 
   kable(booktabs = TRUE, linesep = "",
-        caption = paste("Wald test p-values"))%>% 
+        caption = paste("Wald test p-values")) %>% 
   kable_styling(latex_options = c("striped", "HOLD_position", "repeat_header")) %>% 
   landscape()
 ```
