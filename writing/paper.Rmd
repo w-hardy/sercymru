@@ -727,7 +727,13 @@ gp_2020_percentiles <-
     percentile = c(5, 25, 50, 75, 95),
     # wimd2019 = percentiles(gp_2020, wimd2019),
     ngp = percentiles(gp_2020, ngp),
-    gp_load = percentiles(gp_2020, gp_load))
+    gp_load = percentiles(gp_2020, gp_load),
+    PC1 = percentiles(gp_2020, PC1),
+    PC2 = percentiles(gp_2020, PC2),
+    PC3 = percentiles(gp_2020, PC3),
+    PC4 = percentiles(gp_2020, PC4))
+
+median(gp_2020$PC1)
 ```
 
 * Figures represent predicted changes to dispensing based on GLS models
@@ -747,7 +753,8 @@ for(i in drugs){
     Predict(best_bs_models[[i]], Month, 
             hboard = "BC", dispensing = FALSE, wimd2019 = "Med", ngp = 5, 
             gp_load = 1329.486, 
-            PC1 = -0.1257104, PC2 = 0.1257104, PC3 = 0.1257104, PC4 = -0.09966945,
+            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
             conf.int = .95)
   
   options(datadist = NULL)
@@ -779,7 +786,8 @@ for(i in drugs_hb){
     Predict(best_bs_models[[i]], Month, hboard,
             dispensing = FALSE, wimd2019 = "Med", ngp = 5, 
             gp_load = 1329.486, 
-            PC1 = -0.1257104, PC2 = 0.1257104, PC3 = 0.1257104, PC4 = -0.09966945,
+            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
             conf.int = .95)
   
   options(datadist = NULL)
@@ -829,28 +837,68 @@ ggsave(filename = "Draft 5/Figures/health-board.png", device = "png", height = 1
 disp_contrasts <- 
   list(
     all_drugs = contrast(best_bs_models$all_drugs, 
-                         list(Month = 3:8, dispensing = TRUE),
-                         list(Month = 3:8, dispensing = FALSE)) %>% 
+                         list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                              ngp = 5, gp_load = 1329,
+                              PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                              PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                              dispensing = TRUE),
+                         list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                              ngp = 5, gp_load = 1329,
+                              PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                              PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                              dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     cortico = contrast(best_bs_models$cortico, 
-                       list(Month = 3:8, dispensing = TRUE),
-                       list(Month = 3:8, dispensing = FALSE)) %>% 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = TRUE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     paracet = contrast(best_bs_models$paracet, 
-                       list(Month = 3:8, dispensing = TRUE),
-                       list(Month = 3:8, dispensing = FALSE)) %>% 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = TRUE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     sal = contrast(best_bs_models$sal, 
-                   list(Month = 3:8, dispensing = TRUE),
-                   list(Month = 3:8, dispensing = FALSE)) %>% 
+                   list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                        ngp = 5, gp_load = 1329,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = TRUE),
+                   list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                        ngp = 5, gp_load = 1329,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     vitd = contrast(best_bs_models$vitd, 
-                    list(Month = 3:8, dispensing = TRUE),
-                    list(Month = 3:8, dispensing = FALSE)) %>% 
+                    list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                         ngp = 5, gp_load = 1329,
+                         PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                         PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                         dispensing = TRUE),
+                    list(Month = 3:8, hboard = "BC", wimd2019 = "Med", 
+                         ngp = 5, gp_load = 1329,
+                         PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                         PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                         dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame()
   ) %>% 
@@ -868,7 +916,8 @@ disp_contrasts <-
   scale_colour_viridis_d("Drug", drop = FALSE) +
   ylab("Dispensing - Non-dispensing"))
 
-ggsave(filename = "Draft 5/Figures/dispensing-status.png", device = "png", height = 14, width = 25, units = "cm")
+ggsave(filename = "Draft 5/Figures/dispensing-status.png", device = "png", 
+       height = 14, width = 25, units = "cm")
 
 
 disp_contrasts %>% 
@@ -890,23 +939,55 @@ disp_contrasts %>%
 wimd_contrasts <- 
   list(
     cortico = contrast(best_bs_models$cortico, 
-                       list(Month = 3:8, wimd2019 = "Low"),
-                       list(Month = 3:8, wimd2019 = "High")) %>% 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     sal = contrast(best_bs_models$sal, 
-                   list(Month = 3:8, wimd2019 = "Low"),
-                   list(Month = 3:8, wimd2019 = "High")) %>% 
+                   list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     ssri = contrast(best_bs_models$ssri, 
-                       list(Month = 3:8, wimd2019 = "Low"),
-                       list(Month = 3:8, wimd2019 = "High")) %>% 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     vitd = contrast(best_bs_models$vitd, 
-                    list(Month = 3:8, wimd2019 = "Low"),
-                    list(Month = 3:8, wimd2019 = "High")) %>% 
+                    list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame()
   ) %>% 
@@ -941,13 +1022,29 @@ wimd_contrasts %>%
 ngp_contrasts <- 
   list(
     oral_contra = contrast(best_bs_models$oral_contra, 
-                       list(Month = 3:8, ngp = 3),
-                       list(Month = 3:8, ngp = 8)) %>% 
+                           list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                                ngp = 3, gp_load = 1329,
+                                PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                                PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                                dispensing = FALSE),
+                           list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                                ngp = 8, gp_load = 1329,
+                                PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                                PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                                dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame(),
     sal = contrast(best_bs_models$sal, 
-                   list(Month = 3:8, ngp = 3),
-                   list(Month = 3:8, ngp = 8)) %>% 
+                   list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                        ngp = 3, gp_load = 1329,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = FALSE),
+                   list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                        ngp = 8, gp_load = 1329,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame()) %>% 
   bind_rows(.id = "drug")
@@ -980,8 +1077,16 @@ ngp_contrasts %>%
 gpld_contrasts <- 
   list(
     oral_contra = contrast(best_bs_models$oral_contra, 
-                       list(Month = 3:8, gp_load = 1098),
-                       list(Month = 3:8, gp_load = 1710)) %>% 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                        ngp = 8, gp_load = 1098,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                        ngp = 8, gp_load = 1710,
+                        PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                        PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                        dispensing = FALSE)) %>% 
       .[c("Month", "Contrast", "Lower", "Upper")] %>% 
       as.data.frame()) %>% 
   bind_rows(.id = "drug")
@@ -1051,10 +1156,12 @@ contrasts %>%
                 width = 0) +
   geom_hline(aes(yintercept = 0), colour = "grey") +
   ggthemes::theme_few() +
-  theme(legend.spacing.y = unit(0.5, 'cm')) +
+  theme(legend.spacing.y = unit(0.5, 'cm'),
+        plot.caption = element_text(size = 8, hjust = 1)) +
   guides(col = guide_legend(byrow = TRUE)) +
   labs(col = "Drug") +
-  facet_wrap(~effect)
+  facet_wrap(~effect) +
+  labs(caption = paste0("Adjusted to Health Board = BC, Dispensing status = FALSE, WIMD = Med, Number GPs = 5, \nGP workload = 1329, PC1 = ", printnum(median(gp_2020$PC1))," PC2 = ", printnum(median(gp_2020$PC1)), " PC3 = ", printnum(median(gp_2020$PC3)), " PC4 = ", printnum(median(gp_2020$PC4))))
 
 ggsave(filename = "Draft 5/Figures/gls-summary-figure.png", device = "png", height = 14, width = 25, units = "cm")
 ```
