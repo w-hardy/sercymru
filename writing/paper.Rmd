@@ -315,7 +315,7 @@ percentiles <- function(data, var){
   data %>% 
     summarise(enframe(stats::quantile(!!var, c(.05, .25, .5, .75, .95)), 
                       "Percentile", "value"), .groups = "drop") %>% 
-    mutate(value = round(value)) %>% .$value
+    mutate(value = round(value, 2)) %>% .$value
 }
 
 ```
@@ -596,7 +596,9 @@ lockdown_diffs %>%
 ## Table 4
 
 ```{r, gls-functions, echo=FALSE}
-drugs <- unique(differences$drug)
+drugs <- unique(differences$drug) # Remove? Should be in setup
+
+## Assumption checking? ##
 
 #### Redundancy analysis model ####
 redun <- list()
@@ -695,7 +697,7 @@ drugs_hb <- c("all_drugs", "cortico", "nsaid", "oral_contra", "sal", "ssri",
 drugs_disp <- c("all_drugs", "cortico", "paracet", "sal", "vitd")
 
 ## WIMD
-drugs_wimd <- c("cortico", "sal", "ssri", "vitd")
+drugs_wimd <- c("ace", "cortico", "sal", "ssri", "vitd")
 
 ## NGPs
 drugs_ngp <- c("oral_contra", "sal")
@@ -733,7 +735,6 @@ gp_2020_percentiles <-
     PC3 = percentiles(gp_2020, PC3),
     PC4 = percentiles(gp_2020, PC4))
 
-median(gp_2020$PC1)
 ```
 
 * Figures represent predicted changes to dispensing based on GLS models
@@ -938,6 +939,19 @@ disp_contrasts %>%
 ```{r, wimd-contrast-fig, fig.cap="WIMD contrasts and 95% confidence limits from GLS models."}
 wimd_contrasts <- 
   list(
+    ace = contrast(best_bs_models$ace, 
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE),
+                       list(Month = 3:8, hboard = "BC", wimd2019 = "High", 
+                            ngp = 5, gp_load = 1329,
+                            PC1 = median(gp_2020$PC1), PC2 = median(gp_2020$PC2), 
+                            PC3 = median(gp_2020$PC3), PC4 = median(gp_2020$PC4),
+                            dispensing = FALSE)) %>% 
+      .[c("Month", "Contrast", "Lower", "Upper")] %>% 
+      as.data.frame(),
     cortico = contrast(best_bs_models$cortico, 
                        list(Month = 3:8, hboard = "BC", wimd2019 = "Low", 
                             ngp = 5, gp_load = 1329,
