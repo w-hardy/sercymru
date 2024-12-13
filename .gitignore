@@ -18,6 +18,7 @@ writing/*
 
 # Data files
 presdata_updates_040121
+data/
 
 # History files
 .Rhistory
